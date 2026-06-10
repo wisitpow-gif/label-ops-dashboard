@@ -1,0 +1,153 @@
+import type { Project, Task, TaskGroup, TaskStatus, TeamMember } from "./types";
+import { addDays, parseDate } from "./dates";
+
+// ---------------------------------------------------------------------------
+// Mock data for the Dual-View Dashboard (Blueprint Part 2.1).
+// Task template + T-minus offsets follow Blueprint Part 3.2 exactly.
+// ---------------------------------------------------------------------------
+
+export const TEAM: TeamMember[] = [
+  { id: "mind", name: "มายด์", role: "Promoter", initials: "MD" },
+  { id: "benz", name: "เบนซ์", role: "Producer", initials: "BZ" },
+  { id: "ploy", name: "พลอย", role: "Graphic Designer", initials: "PL" },
+  { id: "toon", name: "ตูน", role: "Video Editor", initials: "TN" },
+  { id: "golf", name: "กอล์ฟ", role: "MV Director", initials: "GF" },
+];
+
+export const PROJECTS: Project[] = [
+  {
+    id: "p1",
+    songName: "ใจเย็นเย็น",
+    artistName: "MACHg",
+    releaseDate: "2026-07-17",
+  },
+  {
+    id: "p2",
+    songName: "แสงสุดท้าย",
+    artistName: "เก้าหนึ่ง (9ONE)",
+    releaseDate: "2026-08-21",
+  },
+  {
+    id: "p3",
+    songName: "ก่อนฤดูฝน",
+    artistName: "Velda",
+    releaseDate: "2026-06-12",
+  },
+];
+
+interface TaskTemplate {
+  key: string;
+  group: TaskGroup;
+  name: string;
+  tMinusDays: number;
+  durationDays: number;
+  picId: string;
+  blockedByKey?: string;
+}
+
+// Blueprint Part 3.2 — Task Groups & Templates
+const TASK_TEMPLATE: TaskTemplate[] = [
+  // Group 1: Digital Distribution Pack
+  { key: "typo", group: "Digital Dist. Pack", name: "Song Typo", tMinusDays: 84, durationDays: 7, picId: "mind" },
+  { key: "cover", group: "Digital Dist. Pack", name: "Single Cover & Graphics", tMinusDays: 42, durationDays: 21, picId: "ploy", blockedByKey: "typo" },
+  { key: "master", group: "Digital Dist. Pack", name: "Master Audio", tMinusDays: 42, durationDays: 28, picId: "benz" },
+  { key: "audiopack", group: "Digital Dist. Pack", name: "Audio Pack Submission & Metadata", tMinusDays: 28, durationDays: 7, picId: "mind", blockedByKey: "master" },
+  // Group 2: Teaser MV
+  { key: "shoot", group: "Teaser MV", name: "MV Shooting", tMinusDays: 60, durationDays: 10, picId: "golf" },
+  { key: "teaser", group: "Teaser MV", name: "Teaser Edit", tMinusDays: 28, durationDays: 18, picId: "toon", blockedByKey: "shoot" },
+  { key: "tiktok", group: "Teaser MV", name: "Tiktok Cut", tMinusDays: 28, durationDays: 14, picId: "toon", blockedByKey: "shoot" },
+  // Group 3: Full MV
+  { key: "postprod", group: "Full MV", name: "Post-Production", tMinusDays: 50, durationDays: 25, picId: "toon", blockedByKey: "shoot" },
+  { key: "finalcheck", group: "Full MV", name: "MV Final Check", tMinusDays: 30, durationDays: 7, picId: "mind", blockedByKey: "postprod" },
+  { key: "mvpack", group: "Full MV", name: "MV Pack Submission", tMinusDays: 28, durationDays: 3, picId: "mind", blockedByKey: "finalcheck" },
+];
+
+function makeTasks(projectId: string, statuses: Record<string, TaskStatus>): Task[] {
+  return TASK_TEMPLATE.map((t) => ({
+    id: `${projectId}-${t.key}`,
+    projectId,
+    group: t.group,
+    name: t.name,
+    tMinusDays: t.tMinusDays,
+    durationDays: t.durationDays,
+    status: statuses[t.key] ?? "Not Start",
+    picId: t.picId,
+    blockedBy: t.blockedByKey ? `${projectId}-${t.blockedByKey}` : undefined,
+  }));
+}
+
+export const TASKS: Task[] = [
+  // p1 — mid-production: Master Audio overdue (WIP past deadline)
+  // → downstream Audio Pack shows as Blocked (bottleneck demo)
+  ...makeTasks("p1", {
+    typo: "Done",
+    cover: "Done",
+    master: "WIP",
+    audiopack: "Blocked",
+    shoot: "Done",
+    teaser: "WIP",
+    tiktok: "Not Start",
+    postprod: "Done",
+    finalcheck: "WIP",
+    mvpack: "Not Start",
+  }),
+  // p2 — early phase: most tasks not started yet
+  ...makeTasks("p2", {
+    typo: "Done",
+    cover: "WIP",
+    master: "WIP",
+  }),
+  // p3 — releasing this week: everything wrapped
+  ...makeTasks("p3", {
+    typo: "Done",
+    cover: "Done",
+    master: "Done",
+    audiopack: "Done",
+    shoot: "Done",
+    teaser: "Done",
+    tiktok: "Done",
+    postprod: "Done",
+    finalcheck: "Done",
+    mvpack: "Done",
+  }),
+];
+
+// ---------------------------------------------------------------------------
+// Derived helpers used by both views
+// ---------------------------------------------------------------------------
+
+export function memberById(id: string): TeamMember | undefined {
+  return TEAM.find((m) => m.id === id);
+}
+
+export function tasksOfProject(projectId: string): Task[] {
+  return TASKS.filter((t) => t.projectId === projectId);
+}
+
+export function taskById(id: string): Task | undefined {
+  return TASKS.find((t) => t.id === id);
+}
+
+/** Deadline = release date minus T-minus offset (calendar days for now) */
+export function taskDeadline(task: Task, project: Project): Date {
+  return addDays(parseDate(project.releaseDate), -task.tMinusDays);
+}
+
+/** Gantt bar start = deadline minus working window */
+export function taskStart(task: Task, project: Project): Date {
+  return addDays(taskDeadline(task, project), -task.durationDays);
+}
+
+/** Roll task statuses up to a pack-level status for the Project View columns */
+export function packStatus(tasks: Task[]): TaskStatus {
+  if (tasks.some((t) => t.status === "Blocked")) return "Blocked";
+  if (tasks.length > 0 && tasks.every((t) => t.status === "Done")) return "Done";
+  if (tasks.some((t) => t.status === "WIP" || t.status === "Done")) return "WIP";
+  return "Not Start";
+}
+
+export const TASK_GROUPS: TaskGroup[] = [
+  "Digital Dist. Pack",
+  "Teaser MV",
+  "Full MV",
+];
