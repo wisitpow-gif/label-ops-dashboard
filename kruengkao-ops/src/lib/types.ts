@@ -27,10 +27,45 @@ export interface Task {
   blockedBy?: string;
 }
 
+// --- Phase 2: Financial & Contract Setup ---
+
+/** PAYEES.payee_type — Individual / Company / Band (Blueprint Part 5) */
+export type PayeeType = "Individual" | "Company" | "Band";
+
+/** One row of the Recoupable Ledger (maps to PROJECT_EXPENSES) */
+export interface ExpenseEntry {
+  id: string;
+  description: string;
+  payeeName: string;
+  payeeType: PayeeType;
+  /** Kept as string for free typing; parsed for totals */
+  amount: string;
+  isRecoupable: boolean;
+}
+
+/** One royalty split row (maps to SONG_SPLITS) */
+export interface SplitEntry {
+  id: string;
+  role: string;
+  payeeType: PayeeType;
+  name: string;
+  /** Kept as string for free typing; parsed for totals */
+  percentage: string;
+  /** Payment condition, e.g. "สมาชิก 4 คนแบ่งเท่าๆกัน" */
+  note: string;
+}
+
+export interface ProjectFinance {
+  expenses: ExpenseEntry[];
+  splits: SplitEntry[];
+}
+
 export interface Project {
   id: string;
   songName: string;
   artistName: string;
+  /** Label / sub-label the release belongs to */
+  label: string;
   /** ISO date string yyyy-mm-dd */
   releaseDate: string;
 }

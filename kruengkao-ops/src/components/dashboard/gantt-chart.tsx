@@ -13,14 +13,7 @@ import {
   parseDate,
   startOfToday,
 } from "@/lib/dates";
-import {
-  PROJECTS,
-  memberById,
-  taskById,
-  taskDeadline,
-  taskStart,
-  tasksOfProject,
-} from "@/lib/mock-data";
+import { memberById, taskDeadline, taskStart } from "@/lib/mock-data";
 import type { Project, Task, TaskStatus } from "@/lib/types";
 
 // TODO(Phase 2): drag & drop to adjust start/end dates + SVG dependency
@@ -52,16 +45,20 @@ function TaskBar({
   task,
   project,
   range,
+  allTasks,
 }: {
   task: Task;
   project: Project;
   range: Range;
+  allTasks: Task[];
 }) {
   const start = taskStart(task, project);
   const deadline = taskDeadline(task, project);
   const overdue = deadline < startOfToday() && task.status !== "Done";
   const pic = memberById(task.picId);
-  const blocker = task.blockedBy ? taskById(task.blockedBy) : undefined;
+  const blocker = task.blockedBy
+    ? allTasks.find((t) => t.id === task.blockedBy)
+    : undefined;
 
   const left = pct(range, start);
   const width = Math.max(pct(range, deadline) - left, 1);
@@ -122,7 +119,13 @@ const subscribeNoop = () => () => {};
 const getClientToday = () => (cachedToday ??= startOfToday());
 const getServerToday = () => null;
 
-export function GanttChart() {
+export function GanttChart({
+  projects,
+  tasks,
+}: {
+  projects: Project[];
+  tasks: Task[];
+}) {
   const today = React.useSyncExternalStore(
     subscribeNoop,
     getClientToday,
@@ -130,14 +133,16 @@ export function GanttChart() {
   );
 
   const range: Range = React.useMemo(() => {
-    const starts = PROJECTS.flatMap((p) =>
-      tasksOfProject(p.id).map((t) => taskStart(t, p))
+    const starts = projects.flatMap((p) =>
+      tasks
+        .filter((t) => t.projectId === p.id)
+        .map((t) => taskStart(t, p))
     );
-    const releases = PROJECTS.map((p) => parseDate(p.releaseDate));
+    const releases = projects.map((p) => parseDate(p.releaseDate));
     const min = addDays(new Date(Math.min(...starts.map((d) => d.getTime()))), -4);
     const max = addDays(new Date(Math.max(...releases.map((d) => d.getTime()))), 8);
     return { start: min, totalDays: diffDays(min, max) };
-  }, []);
+  }, [projects, tasks]);
 
   const months = monthSegments(range);
 
@@ -162,8 +167,8 @@ export function GanttChart() {
           </div>
         </div>
 
-        {PROJECTS.map((project) => {
-          const tasks = tasksOfProject(project.id);
+        {projects.map((project) => {
+          const projectTasks = tasks.filter((t) => t.projectId === project.id);
           const releasePct = pct(range, parseDate(project.releaseDate));
           return (
             <div key={project.id} className="border-b last:border-b-0">
@@ -172,7 +177,8 @@ export function GanttChart() {
                 <div className="w-56 shrink-0 border-r px-3 py-2">
                   <div className="text-sm font-semibold">{project.songName}</div>
                   <div className="text-xs text-muted-foreground">
-                    {project.artistName} · ปล่อย {formatFull(parseDate(project.releaseDate))}
+                    {project.artistName} ({project.label}) · ปล่อย{" "}
+                    {formatFull(parseDate(project.releaseDate))}
                   </div>
                 </div>
                 <div className="relative flex-1">
@@ -195,7 +201,7 @@ export function GanttChart() {
               </div>
 
               {/* Task rows */}
-              {tasks.map((task) => {
+              {projectTasks.map((task) => {
                 const deadline = taskDeadline(task, project);
                 const overdue =
                   today !== null && deadline < today && task.status !== "Done";
@@ -228,7 +234,12 @@ export function GanttChart() {
                           style={{ left: `${pct(range, today)}%` }}
                         />
                       )}
-                      <TaskBar task={task} project={project} range={range} />
+                      <TaskBar
+                        task={task}
+                        project={project}
+                        range={range}
+                        allTasks={projectTasks}
+                      />
                     </div>
                   </div>
                 );

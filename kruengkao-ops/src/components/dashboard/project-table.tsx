@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  FileText,
   Link2,
   TriangleAlert,
 } from "lucide-react";
@@ -22,15 +23,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatFull, formatShort, parseDate, startOfToday } from "@/lib/dates";
-import {
-  PROJECTS,
-  TASK_GROUPS,
-  memberById,
-  packStatus,
-  taskById,
-  taskDeadline,
-  tasksOfProject,
-} from "@/lib/mock-data";
+import { TASK_GROUPS, memberById, packStatus, taskDeadline } from "@/lib/mock-data";
 import type { Project, Task, TaskGroup } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
 
@@ -59,11 +52,21 @@ function PackCell({ tasks }: { tasks: Task[] }) {
   );
 }
 
-function SubTaskRow({ task, project }: { task: Task; project: Project }) {
+function SubTaskRow({
+  task,
+  project,
+  allTasks,
+}: {
+  task: Task;
+  project: Project;
+  allTasks: Task[];
+}) {
   const deadline = taskDeadline(task, project);
   const overdue = deadline < startOfToday() && task.status !== "Done";
   const pic = memberById(task.picId);
-  const blocker = task.blockedBy ? taskById(task.blockedBy) : undefined;
+  const blocker = task.blockedBy
+    ? allTasks.find((t) => t.id === task.blockedBy)
+    : undefined;
 
   return (
     <div className="space-y-1 px-3 py-2">
@@ -106,8 +109,7 @@ function SubTaskRow({ task, project }: { task: Task; project: Project }) {
 }
 
 /** Expanded panel under a project row: sub-tasks grouped by pack */
-function SubTaskPanel({ project }: { project: Project }) {
-  const tasks = tasksOfProject(project.id);
+function SubTaskPanel({ project, tasks }: { project: Project; tasks: Task[] }) {
   return (
     <div className="grid gap-3 bg-muted/40 p-4 lg:grid-cols-3">
       {TASK_GROUPS.map((group: TaskGroup) => {
@@ -120,7 +122,12 @@ function SubTaskPanel({ project }: { project: Project }) {
             </div>
             <div className="divide-y">
               {groupTasks.map((task) => (
-                <SubTaskRow key={task.id} task={task} project={project} />
+                <SubTaskRow
+                  key={task.id}
+                  task={task}
+                  project={project}
+                  allTasks={tasks}
+                />
               ))}
             </div>
           </div>
@@ -130,7 +137,15 @@ function SubTaskPanel({ project }: { project: Project }) {
   );
 }
 
-export function ProjectTable() {
+export function ProjectTable({
+  projects,
+  tasks,
+  onOpenDetails,
+}: {
+  projects: Project[];
+  tasks: Task[];
+  onOpenDetails: (project: Project) => void;
+}) {
   const [expanded, setExpanded] = React.useState<Set<string>>(
     () => new Set(["p1"])
   );
@@ -153,11 +168,14 @@ export function ProjectTable() {
             <TableHead className="w-40">Digital Dist. Pack</TableHead>
             <TableHead className="w-40">Teaser MV</TableHead>
             <TableHead className="w-40">Full MV</TableHead>
+            <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {PROJECTS.map((project) => {
-            const tasks = tasksOfProject(project.id);
+          {projects.map((project) => {
+            const projectTasks = tasks.filter(
+              (t) => t.projectId === project.id
+            );
             const isOpen = expanded.has(project.id);
             return (
               <React.Fragment key={project.id}>
@@ -192,21 +210,42 @@ export function ProjectTable() {
                       <div>
                         <div className="font-medium">{project.songName}</div>
                         <div className="text-xs text-muted-foreground">
-                          {project.artistName}
+                          {project.artistName} · {project.label}
                         </div>
                       </div>
                     </div>
                   </TableCell>
                   {TASK_GROUPS.map((group) => (
                     <TableCell key={group}>
-                      <PackCell tasks={tasks.filter((t) => t.group === group)} />
+                      <PackCell
+                        tasks={projectTasks.filter((t) => t.group === group)}
+                      />
                     </TableCell>
                   ))}
+                  <TableCell>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground"
+                          aria-label="เปิดรายละเอียดโปรเจกต์"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenDetails(project);
+                          }}
+                        >
+                          <FileText className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Project Details</TooltipContent>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
                 {isOpen && (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={5} className="p-0">
-                      <SubTaskPanel project={project} />
+                    <TableCell colSpan={6} className="p-0">
+                      <SubTaskPanel project={project} tasks={projectTasks} />
                     </TableCell>
                   </TableRow>
                 )}

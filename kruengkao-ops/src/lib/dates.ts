@@ -13,6 +13,13 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
+/** Format as yyyy-mm-dd using local time (toISOString would shift the day across timezones) */
+export function toISODate(date: Date): string {
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
 export function startOfToday(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());

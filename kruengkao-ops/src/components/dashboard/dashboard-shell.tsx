@@ -1,14 +1,49 @@
 "use client";
 
-import { ChartGantt, Disc3, Plus, Table2 } from "lucide-react";
+import * as React from "react";
+import { ChartGantt, Disc3, Table2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { toISODate } from "@/lib/dates";
+import { PROJECTS, TASKS, generateTasks } from "@/lib/mock-data";
+import type { Project, Task } from "@/lib/types";
+import {
+  CreateProjectDialog,
+  type NewProjectInput,
+} from "./create-project-dialog";
 import { GanttChart } from "./gantt-chart";
+import { ProjectDetailsSheet } from "./project-details-sheet";
 import { ProjectTable } from "./project-table";
 
 export function DashboardShell() {
+  const [projects, setProjects] = React.useState<Project[]>(PROJECTS);
+  const [tasks, setTasks] = React.useState<Task[]>(TASKS);
+  const [detailsProject, setDetailsProject] = React.useState<Project | null>(
+    null
+  );
+
+  function handleCreate(values: NewProjectInput) {
+    const id = crypto.randomUUID();
+    const project: Project = {
+      id,
+      songName: values.songTitle,
+      artistName: values.artist,
+      label: values.label,
+      releaseDate: toISODate(values.releaseDate),
+    };
+    setProjects((prev) => [...prev, project]);
+    // "Generate Timeline": stamp the full workback task template onto the
+    // new project (all Not Start; deadlines derive from the release date)
+    setTasks((prev) => [...prev, ...generateTasks(id)]);
+  }
+
+  const sortedProjects = React.useMemo(
+    () =>
+      [...projects].sort((a, b) => a.releaseDate.localeCompare(b.releaseDate)),
+    [projects]
+  );
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
@@ -26,11 +61,7 @@ export function DashboardShell() {
               </p>
             </div>
           </div>
-          {/* Placeholder for the Foolproof Data Entry modal (Blueprint Part 2.2) */}
-          <Button disabled>
-            <Plus data-icon="inline-start" />
-            Initiate Project
-          </Button>
+          <CreateProjectDialog onCreate={handleCreate} />
         </header>
 
         <Tabs defaultValue="table">
@@ -45,12 +76,24 @@ export function DashboardShell() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="table">
-            <ProjectTable />
+            <ProjectTable
+              projects={sortedProjects}
+              tasks={tasks}
+              onOpenDetails={setDetailsProject}
+            />
           </TabsContent>
           <TabsContent value="gantt">
-            <GanttChart />
+            <GanttChart projects={sortedProjects} tasks={tasks} />
           </TabsContent>
         </Tabs>
+
+        <ProjectDetailsSheet
+          project={detailsProject}
+          tasks={tasks}
+          onOpenChange={(open) => {
+            if (!open) setDetailsProject(null);
+          }}
+        />
       </div>
     </TooltipProvider>
   );
