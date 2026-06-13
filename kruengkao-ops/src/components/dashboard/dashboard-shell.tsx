@@ -1,12 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { ChartGantt, Disc3, Table2 } from "lucide-react";
+import { ChartGantt, Disc3, ListFilter, Table2 } from "lucide-react";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { toISODate } from "@/lib/dates";
-import { PROJECTS, TASKS, generateTasks } from "@/lib/mock-data";
+import {
+  LABELS,
+  LABEL_FILTER_ALL,
+  PROJECTS,
+  TASKS,
+  generateTasks,
+} from "@/lib/mock-data";
 import type { Project, Task } from "@/lib/types";
 import {
   CreateProjectDialog,
@@ -22,6 +36,8 @@ export function DashboardShell() {
   const [detailsProject, setDetailsProject] = React.useState<Project | null>(
     null
   );
+  const [selectedLabel, setSelectedLabel] =
+    React.useState<string>(LABEL_FILTER_ALL);
 
   function handleCreate(values: NewProjectInput) {
     const id = crypto.randomUUID();
@@ -44,6 +60,15 @@ export function DashboardShell() {
     [projects]
   );
 
+  // Global label filter — drives both the Project View and the Gantt Chart
+  const filteredProjects = React.useMemo(
+    () =>
+      selectedLabel === LABEL_FILTER_ALL
+        ? sortedProjects
+        : sortedProjects.filter((p) => p.label === selectedLabel),
+    [sortedProjects, selectedLabel]
+  );
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
@@ -61,7 +86,24 @@ export function DashboardShell() {
               </p>
             </div>
           </div>
-          <CreateProjectDialog onCreate={handleCreate} />
+          <div className="flex items-center gap-2">
+            <Select value={selectedLabel} onValueChange={setSelectedLabel}>
+              <SelectTrigger className="w-[180px]" aria-label="กรองตามสังกัด">
+                <ListFilter className="size-4 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={LABEL_FILTER_ALL}>{LABEL_FILTER_ALL}</SelectItem>
+                <SelectSeparator />
+                {LABELS.map((label) => (
+                  <SelectItem key={label} value={label}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <CreateProjectDialog onCreate={handleCreate} />
+          </div>
         </header>
 
         <Tabs defaultValue="table">
@@ -77,13 +119,13 @@ export function DashboardShell() {
           </TabsList>
           <TabsContent value="table">
             <ProjectTable
-              projects={sortedProjects}
+              projects={filteredProjects}
               tasks={tasks}
               onOpenDetails={setDetailsProject}
             />
           </TabsContent>
           <TabsContent value="gantt">
-            <GanttChart projects={sortedProjects} tasks={tasks} />
+            <GanttChart projects={filteredProjects} tasks={tasks} />
           </TabsContent>
         </Tabs>
 

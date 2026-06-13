@@ -172,6 +172,16 @@ export function ProjectTable({
           </TableRow>
         </TableHeader>
         <TableBody>
+          {projects.length === 0 && (
+            <TableRow className="hover:bg-transparent">
+              <TableCell
+                colSpan={6}
+                className="py-12 text-center text-sm text-muted-foreground"
+              >
+                ไม่มีโปรเจกต์ในสังกัดนี้
+              </TableCell>
+            </TableRow>
+          )}
           {projects.map((project) => {
             const projectTasks = tasks.filter(
               (t) => t.projectId === project.id

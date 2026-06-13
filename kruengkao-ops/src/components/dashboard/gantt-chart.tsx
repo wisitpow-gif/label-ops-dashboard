@@ -132,7 +132,8 @@ export function GanttChart({
     getServerToday
   );
 
-  const range: Range = React.useMemo(() => {
+  const range: Range | null = React.useMemo(() => {
+    if (projects.length === 0) return null;
     const starts = projects.flatMap((p) =>
       tasks
         .filter((t) => t.projectId === p.id)
@@ -143,6 +144,14 @@ export function GanttChart({
     const max = addDays(new Date(Math.max(...releases.map((d) => d.getTime()))), 8);
     return { start: min, totalDays: diffDays(min, max) };
   }, [projects, tasks]);
+
+  if (!range) {
+    return (
+      <div className="flex items-center justify-center rounded-xl border p-12 text-sm text-muted-foreground">
+        ไม่มีโปรเจกต์ในสังกัดนี้
+      </div>
+    );
+  }
 
   const months = monthSegments(range);
 

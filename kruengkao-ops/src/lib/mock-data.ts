@@ -21,34 +21,63 @@ export const TEAM: TeamMember[] = [
   { id: "golf", name: "กอล์ฟ", role: "MV Director", initials: "GF" },
 ];
 
+// Exact release schedule extracted from the label's spreadsheet.
 export const PROJECTS: Project[] = [
   {
-    id: "p1",
-    songName: "ใจเย็นเย็น",
-    artistName: "Only Monday",
-    label: "MACHg",
-    releaseDate: "2026-07-17",
+    id: "1",
+    songName: "Single Player",
+    artistName: "NINEOKMAI",
+    label: "BRIDGE",
+    releaseDate: "2026-07-07",
   },
   {
-    id: "p2",
-    songName: "แสงสุดท้าย",
+    id: "2",
+    songName: "จำเลย",
     artistName: "Tilly Birds",
-    label: "BRIDGE Management",
-    releaseDate: "2026-08-21",
+    label: "BRIDGE",
+    releaseDate: "2026-07-14",
   },
   {
-    id: "p3",
-    songName: "ก่อนฤดูฝน",
-    artistName: "AYLA's",
-    label: "On & On",
-    releaseDate: "2026-06-12",
+    id: "3",
+    songName: "OST. คำสารภาพของหมอผี",
+    artistName: "ปราง ปรางทิพย์",
+    label: "MACHg",
+    releaseDate: "2026-07-23",
   },
   {
-    id: "p4",
-    songName: "ไม่เห็นจะต้องอายเลยถ้าอยากจะร้องไห้",
-    artistName: "The Darkest Romance",
-    label: "BRIDGE Management",
-    releaseDate: "2026-09-18",
+    id: "4",
+    songName: "ลืมลบเลือน",
+    artistName: "Hard Boy",
+    label: "BRIDGE",
+    releaseDate: "2026-08-04",
+  },
+  {
+    id: "5",
+    songName: "วัฏสงสาร",
+    artistName: "TaitosmitH Feat. PINKIE",
+    label: "9Arkkhan",
+    releaseDate: "2026-08-13",
+  },
+  {
+    id: "6",
+    songName: "คะนึงนิตย์",
+    artistName: "ปราง ปรางทิพย์",
+    label: "MACHg",
+    releaseDate: "2026-08-20",
+  },
+  {
+    id: "7",
+    songName: "เพลงกัลยา",
+    artistName: "ASIA7",
+    label: "BRIDGE",
+    releaseDate: "2026-08-25",
+  },
+  {
+    id: "8",
+    songName: "หนุ่ม ปริญวัฒน์ S.1",
+    artistName: "หนุ่ม ปริญวัฒน์",
+    label: "MACHg",
+    releaseDate: "2026-09-03",
   },
 ];
 
@@ -94,43 +123,68 @@ function makeTasks(projectId: string, statuses: Record<string, TaskStatus>): Tas
 }
 
 export const TASKS: Task[] = [
-  // p1 — mid-production: Master Audio overdue (WIP past deadline)
-  // → downstream Audio Pack shows as Blocked (bottleneck demo)
-  ...makeTasks("p1", {
-    typo: "Done",
-    cover: "Done",
-    master: "WIP",
-    audiopack: "Blocked",
-    shoot: "Done",
-    teaser: "WIP",
-    tiktok: "Not Start",
-    postprod: "Done",
-    finalcheck: "WIP",
-    mvpack: "Not Start",
-  }),
-  // p2 — early phase: most tasks not started yet
-  ...makeTasks("p2", {
-    typo: "Done",
-    cover: "WIP",
-    master: "WIP",
-  }),
-  // p3 — releasing this week: everything wrapped
-  ...makeTasks("p3", {
+  // 1 — Single Player (Jul 7): closest release, wrapping up
+  ...makeTasks("1", {
     typo: "Done",
     cover: "Done",
     master: "Done",
     audiopack: "Done",
     shoot: "Done",
     teaser: "Done",
-    tiktok: "Done",
+    tiktok: "WIP",
     postprod: "Done",
     finalcheck: "Done",
-    mvpack: "Done",
+    mvpack: "WIP",
   }),
-  // p4 — kickoff phase: recording wrapped, financial setup in progress
-  ...makeTasks("p4", {
+  // 2 — จำเลย (Jul 14): advanced, with a bottleneck —
+  // Master Audio late → downstream Audio Pack shows Blocked
+  ...makeTasks("2", {
+    typo: "Done",
+    cover: "Done",
+    master: "WIP",
+    audiopack: "Blocked",
+    shoot: "Done",
+    teaser: "WIP",
+    tiktok: "WIP",
+    postprod: "Done",
+    finalcheck: "WIP",
+    mvpack: "Not Start",
+  }),
+  // 3 — OST (Jul 23): audio-led, MV minimal
+  ...makeTasks("3", {
+    typo: "Done",
+    cover: "Done",
+    master: "Done",
+    audiopack: "WIP",
+  }),
+  // 4 — ลืมลบเลือน (Aug 4): mid-production
+  ...makeTasks("4", {
+    typo: "Done",
+    cover: "WIP",
+    master: "WIP",
+    shoot: "Done",
+    postprod: "WIP",
+  }),
+  // 5 — วัฏสงสาร (Aug 13): mid-early
+  ...makeTasks("5", {
+    typo: "Done",
+    cover: "WIP",
+    master: "WIP",
+    shoot: "Done",
+  }),
+  // 6 — คะนึงนิตย์ (Aug 20): early phase
+  ...makeTasks("6", {
     typo: "Done",
     master: "WIP",
+  }),
+  // 7 — เพลงกัลยา (Aug 25): early phase
+  ...makeTasks("7", {
+    typo: "Done",
+    cover: "WIP",
+  }),
+  // 8 — S.1 (Sep 3): kickoff
+  ...makeTasks("8", {
+    typo: "WIP",
   }),
 ];
 
@@ -186,7 +240,10 @@ export const ARTISTS = [
 ] as const;
 
 // Labels under บริษัท ครึ่งเก้า
-export const LABELS = ["MACHg", "BRIDGE Management", "On & On"] as const;
+export const LABELS = ["BRIDGE", "MACHg", "9Arkkhan"] as const;
+
+// Sentinel for the global header filter ("show every label")
+export const LABEL_FILTER_ALL = "Select All";
 
 // Contributor roles from the SONG_SPLITS schema (Blueprint Part 5)
 // — used again in Phase 2 (Royalty Splits entry)
@@ -204,24 +261,10 @@ export function generateTasks(projectId: string): Task[] {
 // Phase 2: Financial & Contract Setup (Recoupable Ledger + Royalty Splits)
 // ---------------------------------------------------------------------------
 
-// Realistic scenario based on a real label spreadsheet:
-// "ไม่เห็นจะต้องอายเลยถ้าอยากจะร้องไห้" — The Darkest Romance (p4)
-const FINANCE: Record<string, ProjectFinance> = {
-  p4: {
-    expenses: [
-      { id: "p4-e1", description: "Studio Tracking", payeeName: "Axis Studio", payeeType: "Company", amount: "12600", isRecoupable: true },
-      { id: "p4-e2", description: "Mix, Edit, Master", payeeName: "กร มหาดำรงค์กุล", payeeType: "Individual", amount: "18000", isRecoupable: true },
-      { id: "p4-e3", description: "Production Fee (Lyric, Melody, Arrange)", payeeName: "ธิติวัฒน์ รองทอง", payeeType: "Individual", amount: "16600", isRecoupable: true },
-      { id: "p4-e4", description: "Drum Tech", payeeName: "ธณัตชัย เหลือรักษ์", payeeType: "Individual", amount: "3500", isRecoupable: false },
-    ],
-    splits: [
-      { id: "p4-s1", role: "Lyric", payeeType: "Individual", name: "ธิติวัฒน์ รองทอง", percentage: "20.00", note: "Royalty จ่ายตามคนทำงาน" },
-      { id: "p4-s2", role: "Melody", payeeType: "Individual", name: "ธิติวัฒน์ รองทอง", percentage: "20.00", note: "Royalty จ่ายตามคนทำงาน" },
-      { id: "p4-s3", role: "Arrange", payeeType: "Band", name: "The Darkest Romance", percentage: "30.00", note: "Royalty สมาชิก 4 คนแบ่งเท่าๆกัน" },
-      { id: "p4-s4", role: "Producer", payeeType: "Band", name: "The Darkest Romance", percentage: "30.00", note: "Royalty สมาชิก 4 คนแบ่งเท่าๆกัน" },
-    ],
-  },
-};
+// No per-project finance samples yet — each project opens the Finance & Splits
+// tab with one blank starter row. Populate a key here (by project id) once real
+// expense/split figures are available for a song.
+const FINANCE: Record<string, ProjectFinance> = {};
 
 /** Finance data for a project — projects without any yet get one blank row each */
 export function financeOf(projectId: string): ProjectFinance {
