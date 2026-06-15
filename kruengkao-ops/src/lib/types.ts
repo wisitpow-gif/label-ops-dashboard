@@ -5,13 +5,6 @@ export type TaskStatus = "Not Start" | "WIP" | "Done" | "Blocked";
 
 export type TaskGroup = "Digital Dist. Pack" | "Teaser MV" | "Full MV";
 
-export interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  initials: string;
-}
-
 export interface Task {
   id: string;
   projectId: string;
@@ -22,7 +15,10 @@ export interface Task {
   /** Working window length used to draw the Gantt bar */
   durationDays: number;
   status: TaskStatus;
-  picId: string;
+  /** Assigned role / department, e.g. "Producer" or "Unassigned" (tier 1) */
+  role: string;
+  /** Specific staff member within the role; "" = nobody chosen yet (tier 2) */
+  person: string;
   /** Upstream dependency — when that task is late, this one shows as Blocked */
   blockedBy?: string;
 }

@@ -4,7 +4,6 @@ import type {
   Task,
   TaskGroup,
   TaskStatus,
-  TeamMember,
 } from "./types";
 import { addDays, parseDate } from "./dates";
 
@@ -13,13 +12,35 @@ import { addDays, parseDate } from "./dates";
 // Task template + T-minus offsets follow Blueprint Part 3.2 exactly.
 // ---------------------------------------------------------------------------
 
-export const TEAM: TeamMember[] = [
-  { id: "mind", name: "มายด์", role: "Promoter", initials: "MD" },
-  { id: "benz", name: "เบนซ์", role: "Producer", initials: "BZ" },
-  { id: "ploy", name: "พลอย", role: "Graphic Designer", initials: "PL" },
-  { id: "toon", name: "ตูน", role: "Video Editor", initials: "TN" },
-  { id: "golf", name: "กอล์ฟ", role: "MV Director", initials: "GF" },
+// 2-tier team structure: Role (department) → staff members.
+// Tasks are assigned a role first, then a specific person within it.
+export const UNASSIGNED = "Unassigned";
+
+export interface RoleGroup {
+  role: string;
+  members: string[];
+}
+
+export const TEAM_STRUCTURE: RoleGroup[] = [
+  { role: "Promoter", members: ["Eak", "Jah", "Ken", "Lookmou"] },
+  { role: "Creative/MarCom", members: ["Pim", "Aft", "Nutt", "Mook"] },
+  { role: "Graphics", members: ["Ken", "Hem", "Nan", "Korn", "Kai", "Mill"] },
+  { role: "Producer", members: ["Pakbung", "Spy", "Lookkaew", "Ayu"] },
+  { role: "Digital", members: ["Bomb"] },
+  { role: "Distributor", members: ["External"] },
 ];
+
+/** Roles in display order (excludes the Unassigned bucket) */
+export const ROLES = TEAM_STRUCTURE.map((g) => g.role);
+
+export function membersOfRole(role: string): string[] {
+  return TEAM_STRUCTURE.find((g) => g.role === role)?.members ?? [];
+}
+
+/** Avatar initials from a person/role name */
+export function initialsOf(name: string): string {
+  return name ? name.slice(0, 2).toUpperCase() : "";
+}
 
 // Exact release schedule extracted from the label's spreadsheet.
 export const PROJECTS: Project[] = [
@@ -87,25 +108,27 @@ interface TaskTemplate {
   name: string;
   tMinusDays: number;
   durationDays: number;
-  picId: string;
+  role: string;
+  person: string;
   blockedByKey?: string;
 }
 
-// Blueprint Part 3.2 — Task Groups & Templates
+// Blueprint Part 3.2 — Task Groups & Templates.
+// Each task is assigned to a department (role) with a default owner (person).
 const TASK_TEMPLATE: TaskTemplate[] = [
   // Group 1: Digital Distribution Pack
-  { key: "typo", group: "Digital Dist. Pack", name: "Song Typo", tMinusDays: 84, durationDays: 7, picId: "mind" },
-  { key: "cover", group: "Digital Dist. Pack", name: "Single Cover & Graphics", tMinusDays: 42, durationDays: 21, picId: "ploy", blockedByKey: "typo" },
-  { key: "master", group: "Digital Dist. Pack", name: "Master Audio", tMinusDays: 42, durationDays: 28, picId: "benz" },
-  { key: "audiopack", group: "Digital Dist. Pack", name: "Audio Pack Submission & Metadata", tMinusDays: 28, durationDays: 7, picId: "mind", blockedByKey: "master" },
+  { key: "typo", group: "Digital Dist. Pack", name: "Song Typo", tMinusDays: 84, durationDays: 7, role: "Promoter", person: "Eak" },
+  { key: "cover", group: "Digital Dist. Pack", name: "Single Cover & Graphics", tMinusDays: 42, durationDays: 21, role: "Graphics", person: "Hem", blockedByKey: "typo" },
+  { key: "master", group: "Digital Dist. Pack", name: "Master Audio", tMinusDays: 42, durationDays: 28, role: "Producer", person: "Pakbung" },
+  { key: "audiopack", group: "Digital Dist. Pack", name: "Audio Pack Submission & Metadata", tMinusDays: 28, durationDays: 7, role: "Digital", person: "Bomb", blockedByKey: "master" },
   // Group 2: Teaser MV
-  { key: "shoot", group: "Teaser MV", name: "MV Shooting", tMinusDays: 60, durationDays: 10, picId: "golf" },
-  { key: "teaser", group: "Teaser MV", name: "Teaser Edit", tMinusDays: 28, durationDays: 18, picId: "toon", blockedByKey: "shoot" },
-  { key: "tiktok", group: "Teaser MV", name: "Tiktok Cut", tMinusDays: 28, durationDays: 14, picId: "toon", blockedByKey: "shoot" },
+  { key: "shoot", group: "Teaser MV", name: "MV Shooting", tMinusDays: 60, durationDays: 10, role: "Creative/MarCom", person: "Pim" },
+  { key: "teaser", group: "Teaser MV", name: "Teaser Edit", tMinusDays: 28, durationDays: 18, role: "Creative/MarCom", person: "Aft", blockedByKey: "shoot" },
+  { key: "tiktok", group: "Teaser MV", name: "Tiktok Cut", tMinusDays: 28, durationDays: 14, role: "Creative/MarCom", person: "Nutt", blockedByKey: "shoot" },
   // Group 3: Full MV
-  { key: "postprod", group: "Full MV", name: "Post-Production", tMinusDays: 50, durationDays: 25, picId: "toon", blockedByKey: "shoot" },
-  { key: "finalcheck", group: "Full MV", name: "MV Final Check", tMinusDays: 30, durationDays: 7, picId: "mind", blockedByKey: "postprod" },
-  { key: "mvpack", group: "Full MV", name: "MV Pack Submission", tMinusDays: 28, durationDays: 3, picId: "mind", blockedByKey: "finalcheck" },
+  { key: "postprod", group: "Full MV", name: "Post-Production", tMinusDays: 50, durationDays: 25, role: "Creative/MarCom", person: "Mook", blockedByKey: "shoot" },
+  { key: "finalcheck", group: "Full MV", name: "MV Final Check", tMinusDays: 30, durationDays: 7, role: "Promoter", person: "Jah", blockedByKey: "postprod" },
+  { key: "mvpack", group: "Full MV", name: "MV Pack Submission", tMinusDays: 28, durationDays: 3, role: "Distributor", person: "External", blockedByKey: "finalcheck" },
 ];
 
 function makeTasks(projectId: string, statuses: Record<string, TaskStatus>): Task[] {
@@ -117,7 +140,8 @@ function makeTasks(projectId: string, statuses: Record<string, TaskStatus>): Tas
     tMinusDays: t.tMinusDays,
     durationDays: t.durationDays,
     status: statuses[t.key] ?? "Not Start",
-    picId: t.picId,
+    role: t.role,
+    person: t.person,
     blockedBy: t.blockedByKey ? `${projectId}-${t.blockedByKey}` : undefined,
   }));
 }
@@ -191,10 +215,6 @@ export const TASKS: Task[] = [
 // ---------------------------------------------------------------------------
 // Derived helpers used by both views
 // ---------------------------------------------------------------------------
-
-export function memberById(id: string): TeamMember | undefined {
-  return TEAM.find((m) => m.id === id);
-}
 
 export function tasksOfProject(projectId: string): Task[] {
   return TASKS.filter((t) => t.projectId === projectId);

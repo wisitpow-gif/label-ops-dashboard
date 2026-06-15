@@ -4,12 +4,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { memberById } from "@/lib/mock-data";
+import { TEAM_STRUCTURE, UNASSIGNED, initialsOf } from "@/lib/mock-data";
 import type { TaskStatus } from "@/lib/types";
 import { STATUS_LABELS, STATUS_OPTIONS, STATUS_STYLES } from "./status-badge";
 
@@ -61,30 +64,37 @@ export function StatusSelect({
   );
 }
 
-// Sentinel — Radix Select forbids an empty-string item value
-const UNASSIGNED = "unassigned";
-
-// Assignable staff, in the order requested for the dropdown
-const PIC_OPTION_IDS = ["mind", "ploy", "benz", "golf", "toon"];
+// Encode/decode the 2-tier value as "Role::Person" (a person name can repeat
+// across roles, e.g. "Ken" in both Promoter and Graphics, so role is required).
+const SEP = "::";
+const encode = (role: string, person: string) => `${role}${SEP}${person}`;
 
 /**
- * Person-In-Charge as an avatar-pill Select.
- * Stores "" on the task when Unassigned is chosen.
+ * Assignee as a hierarchical Select: staff grouped under their Role.
+ * The user picks a specific person; choosing one sets both role and person.
  */
-export function PicSelect({
-  value,
+export function AssigneeSelect({
+  role,
+  person,
   onChange,
 }: {
-  value: string;
-  onChange: (picId: string) => void;
+  role: string;
+  person: string;
+  onChange: (patch: { role: string; person: string }) => void;
 }) {
-  const selected = memberById(value);
+  const value = person ? encode(role, person) : UNASSIGNED;
+
+  function handleChange(v: string) {
+    if (v === UNASSIGNED) {
+      onChange({ role: UNASSIGNED, person: "" });
+      return;
+    }
+    const [nextRole, nextPerson] = v.split(SEP);
+    onChange({ role: nextRole, person: nextPerson });
+  }
 
   return (
-    <Select
-      value={value || UNASSIGNED}
-      onValueChange={(v) => onChange(v === UNASSIGNED ? "" : v)}
-    >
+    <Select value={value} onValueChange={handleChange}>
       <SelectTrigger
         size="sm"
         aria-label="มอบหมายผู้รับผิดชอบ"
@@ -93,14 +103,22 @@ export function PicSelect({
           "[&>svg]:size-3 [&>svg]:opacity-60"
         )}
       >
-        {selected ? (
+        {person ? (
           <span className="flex items-center gap-1.5">
             <Avatar className="size-4">
               <AvatarFallback className="text-[8px]">
-                {selected.initials}
+                {initialsOf(person)}
               </AvatarFallback>
             </Avatar>
-            <span className="text-foreground/80">{selected.name}</span>
+            <span className="text-foreground/80">{person}</span>
+            <span className="text-muted-foreground">· {role}</span>
+          </span>
+        ) : role && role !== UNASSIGNED ? (
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="flex size-4 items-center justify-center rounded-full border border-dashed text-[8px]">
+              ?
+            </span>
+            {role}
           </span>
         ) : (
           <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -115,22 +133,27 @@ export function PicSelect({
         <SelectItem value={UNASSIGNED}>
           <span className="text-muted-foreground">Unassigned</span>
         </SelectItem>
-        {PIC_OPTION_IDS.map((id) => {
-          const m = memberById(id);
-          if (!m) return null;
-          return (
-            <SelectItem key={id} value={id}>
-              <span className="flex items-center gap-2">
-                <Avatar className="size-5">
-                  <AvatarFallback className="text-[9px]">
-                    {m.initials}
-                  </AvatarFallback>
-                </Avatar>
-                {m.name}
-              </span>
-            </SelectItem>
-          );
-        })}
+        {TEAM_STRUCTURE.map((group) => (
+          <SelectGroup key={group.role}>
+            <SelectSeparator />
+            <SelectLabel>{group.role}</SelectLabel>
+            {group.members.map((member) => (
+              <SelectItem
+                key={encode(group.role, member)}
+                value={encode(group.role, member)}
+              >
+                <span className="flex items-center gap-2">
+                  <Avatar className="size-5">
+                    <AvatarFallback className="text-[9px]">
+                      {initialsOf(member)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {member}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        ))}
       </SelectContent>
     </Select>
   );

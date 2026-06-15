@@ -13,7 +13,7 @@ import {
   parseDate,
   startOfToday,
 } from "@/lib/dates";
-import { memberById, taskDeadline, taskStart } from "@/lib/mock-data";
+import { taskDeadline, taskStart } from "@/lib/mock-data";
 import type { Project, Task, TaskStatus } from "@/lib/types";
 
 // TODO(Phase 2): drag & drop to adjust start/end dates + SVG dependency
@@ -55,7 +55,7 @@ function TaskBar({
   const start = taskStart(task, project);
   const deadline = taskDeadline(task, project);
   const overdue = deadline < startOfToday() && task.status !== "Done";
-  const pic = memberById(task.picId);
+  const assignee = task.person ? `${task.person} (${task.role})` : task.role;
   const blocker = task.blockedBy
     ? allTasks.find((t) => t.id === task.blockedBy)
     : undefined;
@@ -82,7 +82,7 @@ function TaskBar({
             {formatShort(start)} → {formatShort(deadline)} (T-{task.tMinusDays})
           </div>
           <div className="text-xs">
-            PIC: {pic?.name} · สถานะ: {task.status}
+            PIC: {assignee} · สถานะ: {task.status}
             {overdue && " · เลยกำหนด!"}
           </div>
           {blocker && <div className="text-xs">รองาน: {blocker.name}</div>}

@@ -25,7 +25,7 @@ import { formatFull, formatShort, parseDate, startOfToday } from "@/lib/dates";
 import { TASK_GROUPS, packStatus, taskDeadline } from "@/lib/mock-data";
 import type { Project, Task, TaskGroup } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
-import { PicSelect, StatusSelect } from "./task-controls";
+import { AssigneeSelect, StatusSelect } from "./task-controls";
 
 /** Pack-level summary cell: rolled-up status + done/total progress */
 function PackCell({ tasks }: { tasks: Task[] }) {
@@ -101,9 +101,10 @@ function SubTaskRow({
           {formatShort(deadline)}
           <span className="text-muted-foreground">(T-{task.tMinusDays})</span>
         </div>
-        <PicSelect
-          value={task.picId}
-          onChange={(picId) => onTaskUpdate(task.id, { picId })}
+        <AssigneeSelect
+          role={task.role}
+          person={task.person}
+          onChange={(patch) => onTaskUpdate(task.id, patch)}
         />
       </div>
     </div>
