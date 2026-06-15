@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { ChartGantt, Disc3, ListFilter, Table2 } from "lucide-react";
+import {
+  ChartGantt,
+  Disc3,
+  ListFilter,
+  SquareKanban,
+  Table2,
+} from "lucide-react";
 
 import {
   Select,
@@ -27,6 +33,7 @@ import {
   type NewProjectInput,
 } from "./create-project-dialog";
 import { GanttChart } from "./gantt-chart";
+import { KanbanBoard } from "./kanban-board";
 import { ProjectDetailsSheet } from "./project-details-sheet";
 import { ProjectTable } from "./project-table";
 
@@ -53,6 +60,16 @@ export function DashboardShell() {
     // new project (all Not Start; deadlines derive from the release date)
     setTasks((prev) => [...prev, ...generateTasks(id)]);
   }
+
+  // Patch a single sub-task; pack roll-ups recompute from this state on render
+  const handleTaskUpdate = React.useCallback(
+    (taskId: string, patch: Partial<Task>) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t))
+      );
+    },
+    []
+  );
 
   const sortedProjects = React.useMemo(
     () =>
@@ -116,16 +133,28 @@ export function DashboardShell() {
               <ChartGantt data-icon="inline-start" />
               Gantt Chart
             </TabsTrigger>
+            <TabsTrigger value="kanban">
+              <SquareKanban data-icon="inline-start" />
+              Kanban Board
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="table">
             <ProjectTable
               projects={filteredProjects}
               tasks={tasks}
               onOpenDetails={setDetailsProject}
+              onTaskUpdate={handleTaskUpdate}
             />
           </TabsContent>
           <TabsContent value="gantt">
             <GanttChart projects={filteredProjects} tasks={tasks} />
+          </TabsContent>
+          <TabsContent value="kanban">
+            <KanbanBoard
+              projects={filteredProjects}
+              tasks={tasks}
+              onTaskUpdate={handleTaskUpdate}
+            />
           </TabsContent>
         </Tabs>
 

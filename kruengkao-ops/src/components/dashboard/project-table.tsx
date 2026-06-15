@@ -10,7 +10,6 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -23,9 +22,10 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatFull, formatShort, parseDate, startOfToday } from "@/lib/dates";
-import { TASK_GROUPS, memberById, packStatus, taskDeadline } from "@/lib/mock-data";
+import { TASK_GROUPS, packStatus, taskDeadline } from "@/lib/mock-data";
 import type { Project, Task, TaskGroup } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
+import { PicSelect, StatusSelect } from "./task-controls";
 
 /** Pack-level summary cell: rolled-up status + done/total progress */
 function PackCell({ tasks }: { tasks: Task[] }) {
@@ -56,14 +56,15 @@ function SubTaskRow({
   task,
   project,
   allTasks,
+  onTaskUpdate,
 }: {
   task: Task;
   project: Project;
   allTasks: Task[];
+  onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
 }) {
   const deadline = taskDeadline(task, project);
   const overdue = deadline < startOfToday() && task.status !== "Done";
-  const pic = memberById(task.picId);
   const blocker = task.blockedBy
     ? allTasks.find((t) => t.id === task.blockedBy)
     : undefined;
@@ -82,7 +83,10 @@ function SubTaskRow({
             </Tooltip>
           )}
         </div>
-        <StatusBadge status={task.status} />
+        <StatusSelect
+          value={task.status}
+          onChange={(status) => onTaskUpdate(task.id, { status })}
+        />
       </div>
       <div className="flex items-center justify-between gap-2">
         <div
@@ -97,19 +101,25 @@ function SubTaskRow({
           {formatShort(deadline)}
           <span className="text-muted-foreground">(T-{task.tMinusDays})</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Avatar className="size-5">
-            <AvatarFallback className="text-[9px]">{pic?.initials}</AvatarFallback>
-          </Avatar>
-          <span className="text-xs text-muted-foreground">{pic?.name}</span>
-        </div>
+        <PicSelect
+          value={task.picId}
+          onChange={(picId) => onTaskUpdate(task.id, { picId })}
+        />
       </div>
     </div>
   );
 }
 
 /** Expanded panel under a project row: sub-tasks grouped by pack */
-function SubTaskPanel({ project, tasks }: { project: Project; tasks: Task[] }) {
+function SubTaskPanel({
+  project,
+  tasks,
+  onTaskUpdate,
+}: {
+  project: Project;
+  tasks: Task[];
+  onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+}) {
   return (
     <div className="grid gap-3 bg-muted/40 p-4 lg:grid-cols-3">
       {TASK_GROUPS.map((group: TaskGroup) => {
@@ -127,6 +137,7 @@ function SubTaskPanel({ project, tasks }: { project: Project; tasks: Task[] }) {
                   task={task}
                   project={project}
                   allTasks={tasks}
+                  onTaskUpdate={onTaskUpdate}
                 />
               ))}
             </div>
@@ -141,13 +152,15 @@ export function ProjectTable({
   projects,
   tasks,
   onOpenDetails,
+  onTaskUpdate,
 }: {
   projects: Project[];
   tasks: Task[];
   onOpenDetails: (project: Project) => void;
+  onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
 }) {
   const [expanded, setExpanded] = React.useState<Set<string>>(
-    () => new Set(["p1"])
+    () => new Set(["1"])
   );
 
   const toggle = (id: string) =>
@@ -255,7 +268,11 @@ export function ProjectTable({
                 {isOpen && (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={6} className="p-0">
-                      <SubTaskPanel project={project} tasks={projectTasks} />
+                      <SubTaskPanel
+                        project={project}
+                        tasks={projectTasks}
+                        onTaskUpdate={onTaskUpdate}
+                      />
                     </TableCell>
                   </TableRow>
                 )}
