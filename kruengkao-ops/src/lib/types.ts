@@ -3,7 +3,7 @@
 
 export type TaskStatus = "Not Start" | "WIP" | "Done" | "Blocked";
 
-export type TaskGroup = "Digital Dist. Pack" | "Teaser MV" | "Full MV";
+export type TaskGroup = "Digital Distribution Pack" | "TEASER & MV";
 
 export interface Task {
   id: string;

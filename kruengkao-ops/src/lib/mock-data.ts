@@ -113,22 +113,30 @@ interface TaskTemplate {
   blockedByKey?: string;
 }
 
-// Blueprint Part 3.2 — Task Groups & Templates.
-// Each task is assigned to a department (role) with a default owner (person).
+// Production task template — exact task names, groups and default roles.
+// T-minus offsets / durations are sensible workback estimates (the engine is
+// not yet holiday-aware, per Blueprint Part 3.1).
 const TASK_TEMPLATE: TaskTemplate[] = [
   // Group 1: Digital Distribution Pack
-  { key: "typo", group: "Digital Dist. Pack", name: "Song Typo", tMinusDays: 84, durationDays: 7, role: "Promoter", person: "Eak" },
-  { key: "cover", group: "Digital Dist. Pack", name: "Single Cover & Graphics", tMinusDays: 42, durationDays: 21, role: "Graphics", person: "Hem", blockedByKey: "typo" },
-  { key: "master", group: "Digital Dist. Pack", name: "Master Audio", tMinusDays: 42, durationDays: 28, role: "Producer", person: "Pakbung" },
-  { key: "audiopack", group: "Digital Dist. Pack", name: "Audio Pack Submission & Metadata", tMinusDays: 28, durationDays: 7, role: "Digital", person: "Bomb", blockedByKey: "master" },
-  // Group 2: Teaser MV
-  { key: "shoot", group: "Teaser MV", name: "MV Shooting", tMinusDays: 60, durationDays: 10, role: "Creative/MarCom", person: "Pim" },
-  { key: "teaser", group: "Teaser MV", name: "Teaser Edit", tMinusDays: 28, durationDays: 18, role: "Creative/MarCom", person: "Aft", blockedByKey: "shoot" },
-  { key: "tiktok", group: "Teaser MV", name: "Tiktok Cut", tMinusDays: 28, durationDays: 14, role: "Creative/MarCom", person: "Nutt", blockedByKey: "shoot" },
-  // Group 3: Full MV
-  { key: "postprod", group: "Full MV", name: "Post-Production", tMinusDays: 50, durationDays: 25, role: "Creative/MarCom", person: "Mook", blockedByKey: "shoot" },
-  { key: "finalcheck", group: "Full MV", name: "MV Final Check", tMinusDays: 30, durationDays: 7, role: "Promoter", person: "Jah", blockedByKey: "postprod" },
-  { key: "mvpack", group: "Full MV", name: "MV Pack Submission", tMinusDays: 28, durationDays: 3, role: "Distributor", person: "External", blockedByKey: "finalcheck" },
+  { key: "fullmix", group: "Digital Distribution Pack", name: "Full Mix Audio", tMinusDays: 45, durationDays: 14, role: "Promoter", person: "Eak" },
+  { key: "minusone", group: "Digital Distribution Pack", name: "Minus One", tMinusDays: 40, durationDays: 7, role: "Promoter", person: "Jah", blockedByKey: "fullmix" },
+  { key: "backing", group: "Digital Distribution Pack", name: "Backing Track", tMinusDays: 40, durationDays: 7, role: "Promoter", person: "Jah", blockedByKey: "fullmix" },
+  { key: "metadata", group: "Digital Distribution Pack", name: "Metadata", tMinusDays: 28, durationDays: 5, role: "Promoter", person: "Ken" },
+  { key: "cover", group: "Digital Distribution Pack", name: "Single Cover", tMinusDays: 42, durationDays: 21, role: "Graphics", person: "Hem" },
+  { key: "artistprofile", group: "Digital Distribution Pack", name: "Artist Profile", tMinusDays: 35, durationDays: 7, role: "Promoter", person: "Lookmou" },
+  { key: "songprofile", group: "Digital Distribution Pack", name: "Song Profile", tMinusDays: 35, durationDays: 7, role: "Promoter", person: "Lookmou" },
+  { key: "tiktok", group: "Digital Distribution Pack", name: "Tiktok", tMinusDays: 21, durationDays: 10, role: "Creative/MarCom", person: "Nutt" },
+  { key: "prphoto", group: "Digital Distribution Pack", name: "PR Photo", tMinusDays: 50, durationDays: 10, role: "Graphics", person: "Nan" },
+  // Group 2: TEASER & MV
+  { key: "shoot", group: "TEASER & MV", name: "ออกกอง", tMinusDays: 60, durationDays: 2, role: "Producer", person: "Pakbung" },
+  { key: "shootphoto", group: "TEASER & MV", name: "ภาพออกกอง", tMinusDays: 58, durationDays: 5, role: "Producer", person: "Spy", blockedByKey: "shoot" },
+  { key: "teasercut", group: "TEASER & MV", name: "TEASER Cutting Check", tMinusDays: 45, durationDays: 7, role: "Producer", person: "Pakbung", blockedByKey: "shoot" },
+  { key: "teasercolor", group: "TEASER & MV", name: "TEASER Color Check", tMinusDays: 40, durationDays: 5, role: "Producer", person: "Lookkaew", blockedByKey: "teasercut" },
+  { key: "teaserprint", group: "TEASER & MV", name: "TEASER Check print", tMinusDays: 35, durationDays: 3, role: "Producer", person: "Lookkaew", blockedByKey: "teasercolor" },
+  { key: "mvcut", group: "TEASER & MV", name: "MV Cutting Check", tMinusDays: 30, durationDays: 10, role: "Producer", person: "Pakbung", blockedByKey: "shoot" },
+  { key: "mvcolor", group: "TEASER & MV", name: "MV Color Check", tMinusDays: 20, durationDays: 7, role: "Producer", person: "Lookkaew", blockedByKey: "mvcut" },
+  { key: "mvprint", group: "TEASER & MV", name: "MV Check print", tMinusDays: 14, durationDays: 3, role: "Producer", person: "Lookkaew", blockedByKey: "mvcolor" },
+  { key: "subtitle", group: "TEASER & MV", name: "Subtitle", tMinusDays: 10, durationDays: 3, role: "Producer", person: "Ayu", blockedByKey: "mvprint" },
 ];
 
 function makeTasks(projectId: string, statuses: Record<string, TaskStatus>): Task[] {
@@ -149,67 +157,81 @@ function makeTasks(projectId: string, statuses: Record<string, TaskStatus>): Tas
 export const TASKS: Task[] = [
   // 1 — Single Player (Jul 7): closest release, wrapping up
   ...makeTasks("1", {
-    typo: "Done",
+    fullmix: "Done",
+    minusone: "Done",
+    backing: "Done",
+    metadata: "Done",
     cover: "Done",
-    master: "Done",
-    audiopack: "Done",
-    shoot: "Done",
-    teaser: "Done",
+    artistprofile: "Done",
+    songprofile: "Done",
     tiktok: "WIP",
-    postprod: "Done",
-    finalcheck: "Done",
-    mvpack: "WIP",
+    prphoto: "Done",
+    shoot: "Done",
+    shootphoto: "Done",
+    teasercut: "Done",
+    teasercolor: "Done",
+    teaserprint: "Done",
+    mvcut: "WIP",
   }),
   // 2 — จำเลย (Jul 14): advanced, with a bottleneck —
-  // Master Audio late → downstream Audio Pack shows Blocked
+  // TEASER Cutting Check late → downstream Color Check shows Blocked
   ...makeTasks("2", {
-    typo: "Done",
+    fullmix: "Done",
+    minusone: "Done",
+    backing: "WIP",
     cover: "Done",
-    master: "WIP",
-    audiopack: "Blocked",
+    artistprofile: "WIP",
+    songprofile: "WIP",
+    prphoto: "Done",
     shoot: "Done",
-    teaser: "WIP",
-    tiktok: "WIP",
-    postprod: "Done",
-    finalcheck: "WIP",
-    mvpack: "Not Start",
+    shootphoto: "Done",
+    teasercut: "WIP",
+    teasercolor: "Blocked",
+    mvcut: "WIP",
   }),
-  // 3 — OST (Jul 23): audio-led, MV minimal
+  // 3 — OST (Jul 23): audio-led
   ...makeTasks("3", {
-    typo: "Done",
+    fullmix: "Done",
+    minusone: "Done",
+    backing: "Done",
+    metadata: "WIP",
     cover: "Done",
-    master: "Done",
-    audiopack: "WIP",
+    artistprofile: "Done",
+    songprofile: "WIP",
+    prphoto: "WIP",
+    shoot: "Done",
+    shootphoto: "WIP",
   }),
   // 4 — ลืมลบเลือน (Aug 4): mid-production
   ...makeTasks("4", {
-    typo: "Done",
+    fullmix: "Done",
+    minusone: "WIP",
+    backing: "WIP",
     cover: "WIP",
-    master: "WIP",
+    prphoto: "Done",
     shoot: "Done",
-    postprod: "WIP",
+    shootphoto: "WIP",
+    mvcut: "WIP",
   }),
   // 5 — วัฏสงสาร (Aug 13): mid-early
   ...makeTasks("5", {
-    typo: "Done",
+    fullmix: "Done",
     cover: "WIP",
-    master: "WIP",
+    prphoto: "WIP",
     shoot: "Done",
+    shootphoto: "WIP",
   }),
   // 6 — คะนึงนิตย์ (Aug 20): early phase
   ...makeTasks("6", {
-    typo: "Done",
-    master: "WIP",
+    fullmix: "WIP",
+    cover: "WIP",
   }),
   // 7 — เพลงกัลยา (Aug 25): early phase
   ...makeTasks("7", {
-    typo: "Done",
-    cover: "WIP",
+    fullmix: "WIP",
   }),
   // 8 — S.1 (Sep 3): kickoff
-  ...makeTasks("8", {
-    typo: "WIP",
-  }),
+  ...makeTasks("8", {}),
 ];
 
 // ---------------------------------------------------------------------------
@@ -243,9 +265,8 @@ export function packStatus(tasks: Task[]): TaskStatus {
 }
 
 export const TASK_GROUPS: TaskGroup[] = [
-  "Digital Dist. Pack",
-  "Teaser MV",
-  "Full MV",
+  "Digital Distribution Pack",
+  "TEASER & MV",
 ];
 
 // Artist roster — the Foolproof form only allows picking from this list

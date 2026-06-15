@@ -122,7 +122,7 @@ function SubTaskPanel({
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
 }) {
   return (
-    <div className="grid gap-3 bg-muted/40 p-4 lg:grid-cols-3">
+    <div className="grid gap-3 bg-muted/40 p-4 lg:grid-cols-2">
       {TASK_GROUPS.map((group: TaskGroup) => {
         const groupTasks = tasks.filter((t) => t.group === group);
         return (
@@ -179,9 +179,11 @@ export function ProjectTable({
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead className="w-36">Release Date</TableHead>
             <TableHead>Song Name</TableHead>
-            <TableHead className="w-40">Digital Dist. Pack</TableHead>
-            <TableHead className="w-40">Teaser MV</TableHead>
-            <TableHead className="w-40">Full MV</TableHead>
+            {TASK_GROUPS.map((group) => (
+              <TableHead key={group} className="w-48">
+                {group}
+              </TableHead>
+            ))}
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
@@ -189,7 +191,7 @@ export function ProjectTable({
           {projects.length === 0 && (
             <TableRow className="hover:bg-transparent">
               <TableCell
-                colSpan={6}
+                colSpan={TASK_GROUPS.length + 3}
                 className="py-12 text-center text-sm text-muted-foreground"
               >
                 ไม่มีโปรเจกต์ในสังกัดนี้
@@ -268,7 +270,7 @@ export function ProjectTable({
                 </TableRow>
                 {isOpen && (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={6} className="p-0">
+                    <TableCell colSpan={TASK_GROUPS.length + 3} className="p-0">
                       <SubTaskPanel
                         project={project}
                         tasks={projectTasks}

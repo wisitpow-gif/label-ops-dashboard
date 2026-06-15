@@ -27,9 +27,8 @@ const BAR_STYLES: Record<TaskStatus, string> = {
 };
 
 const GROUP_DOTS: Record<string, string> = {
-  "Digital Dist. Pack": "bg-violet-500",
-  "Teaser MV": "bg-amber-500",
-  "Full MV": "bg-sky-500",
+  "Digital Distribution Pack": "bg-violet-500",
+  "TEASER & MV": "bg-amber-500",
 };
 
 interface Range {
