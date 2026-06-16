@@ -102,7 +102,7 @@ export const PROJECTS: Project[] = [
   },
 ];
 
-interface TaskTemplate {
+export interface TaskTemplate {
   key: string;
   group: TaskGroup;
   name: string;
@@ -116,7 +116,7 @@ interface TaskTemplate {
 // Production task template — exact task names, groups and default roles.
 // T-minus offsets / durations are sensible workback estimates (the engine is
 // not yet holiday-aware, per Blueprint Part 3.1).
-const TASK_TEMPLATE: TaskTemplate[] = [
+export const TASK_TEMPLATE: TaskTemplate[] = [
   // Group 1: Digital Distribution Pack
   { key: "fullmix", group: "Digital Distribution Pack", name: "Full Mix Audio", tMinusDays: 45, durationDays: 14, role: "Promoter", person: "Eak" },
   { key: "minusone", group: "Digital Distribution Pack", name: "Minus One", tMinusDays: 40, durationDays: 7, role: "Promoter", person: "Jah", blockedByKey: "fullmix" },

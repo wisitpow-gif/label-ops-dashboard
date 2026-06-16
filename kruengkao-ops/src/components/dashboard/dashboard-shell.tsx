@@ -5,10 +5,12 @@ import {
   ChartGantt,
   Disc3,
   ListFilter,
+  Plus,
   SquareKanban,
   Table2,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -19,47 +21,83 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { toISODate } from "@/lib/dates";
-import {
-  LABELS,
-  LABEL_FILTER_ALL,
-  PROJECTS,
-  TASKS,
-  generateTasks,
-} from "@/lib/mock-data";
+import { parseDate, toISODate } from "@/lib/dates";
+import { LABELS, LABEL_FILTER_ALL } from "@/lib/mock-data";
 import type { Project, Task } from "@/lib/types";
-import {
-  CreateProjectDialog,
-  type NewProjectInput,
-} from "./create-project-dialog";
+import { createProject } from "@/app/actions";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
+import {
+  ProjectFormDialog,
+  type NewProjectInput,
+} from "./project-form-dialog";
 import { ProjectDetailsSheet } from "./project-details-sheet";
 import { ProjectTable } from "./project-table";
 
-export function DashboardShell() {
-  const [projects, setProjects] = React.useState<Project[]>(PROJECTS);
-  const [tasks, setTasks] = React.useState<Task[]>(TASKS);
+export function DashboardShell({
+  initialProjects,
+  initialTasks,
+}: {
+  initialProjects: Project[];
+  initialTasks: Task[];
+}) {
+  const [projects, setProjects] = React.useState<Project[]>(initialProjects);
+  const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
   const [detailsProject, setDetailsProject] = React.useState<Project | null>(
     null
   );
   const [selectedLabel, setSelectedLabel] =
     React.useState<string>(LABEL_FILTER_ALL);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [editProject, setEditProject] = React.useState<Project | null>(null);
 
-  function handleCreate(values: NewProjectInput) {
-    const id = crypto.randomUUID();
-    const project: Project = {
-      id,
-      songName: values.songTitle,
-      artistName: values.artist,
+  // Persist the new project + its template tasks, then merge into local state.
+  async function handleCreate(values: NewProjectInput) {
+    const { project, tasks: newTasks } = await createProject({
+      songTitle: values.songTitle,
+      artist: values.artist,
       label: values.label,
       releaseDate: toISODate(values.releaseDate),
-    };
+    });
     setProjects((prev) => [...prev, project]);
-    // "Generate Timeline": stamp the full workback task template onto the
-    // new project (all Not Start; deadlines derive from the release date)
-    setTasks((prev) => [...prev, ...generateTasks(id)]);
+    setTasks((prev) => [...prev, ...newTasks]);
   }
+
+  // Edit / Delete — local state only for now (Supabase wiring comes next).
+  function handleUpdateProject(values: NewProjectInput) {
+    if (!editProject) return;
+    const id = editProject.id;
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              songName: values.songTitle,
+              artistName: values.artist,
+              label: values.label,
+              releaseDate: toISODate(values.releaseDate),
+            }
+          : p
+      )
+    );
+    setEditProject(null);
+  }
+
+  function handleDeleteProject(id: string) {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    setTasks((prev) => prev.filter((t) => t.projectId !== id));
+    setDetailsProject((prev) => (prev?.id === id ? null : prev));
+  }
+
+  // Project → form values for the edit dialog (releaseDate string → Date)
+  const editValues: NewProjectInput | undefined = editProject
+    ? {
+        songTitle: editProject.songName,
+        artist: editProject.artistName,
+        label: editProject.label,
+        releaseDate: parseDate(editProject.releaseDate),
+      }
+    : undefined;
 
   // Patch a single sub-task; pack roll-ups recompute from this state on render
   const handleTaskUpdate = React.useCallback(
@@ -119,7 +157,10 @@ export function DashboardShell() {
                 ))}
               </SelectContent>
             </Select>
-            <CreateProjectDialog onCreate={handleCreate} />
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus data-icon="inline-start" />
+              Create Project
+            </Button>
           </div>
         </header>
 
@@ -144,6 +185,8 @@ export function DashboardShell() {
               tasks={tasks}
               onOpenDetails={setDetailsProject}
               onTaskUpdate={handleTaskUpdate}
+              onEditProject={setEditProject}
+              onDeleteProject={handleDeleteProject}
             />
           </TabsContent>
           <TabsContent value="gantt">
@@ -164,6 +207,26 @@ export function DashboardShell() {
           onOpenChange={(open) => {
             if (!open) setDetailsProject(null);
           }}
+        />
+
+        {/* Create */}
+        <ProjectFormDialog
+          mode="create"
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onSubmit={handleCreate}
+        />
+
+        {/* Edit (pre-populated; keyed so the form re-inits per project) */}
+        <ProjectFormDialog
+          key={editProject?.id ?? "edit"}
+          mode="edit"
+          open={!!editProject}
+          onOpenChange={(open) => {
+            if (!open) setEditProject(null);
+          }}
+          values={editValues}
+          onSubmit={handleUpdateProject}
         />
       </div>
     </TooltipProvider>

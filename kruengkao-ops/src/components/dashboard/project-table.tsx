@@ -7,10 +7,30 @@ import {
   ChevronRight,
   FileText,
   Link2,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -154,15 +174,20 @@ export function ProjectTable({
   tasks,
   onOpenDetails,
   onTaskUpdate,
+  onEditProject,
+  onDeleteProject,
 }: {
   projects: Project[];
   tasks: Task[];
   onOpenDetails: (project: Project) => void;
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+  onEditProject: (project: Project) => void;
+  onDeleteProject: (projectId: string) => void;
 }) {
   const [expanded, setExpanded] = React.useState<Set<string>>(
     () => new Set(["1"])
   );
+  const [deleteTarget, setDeleteTarget] = React.useState<Project | null>(null);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -185,13 +210,14 @@ export function ProjectTable({
               </TableHead>
             ))}
             <TableHead className="w-12" />
+            <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {projects.length === 0 && (
             <TableRow className="hover:bg-transparent">
               <TableCell
-                colSpan={TASK_GROUPS.length + 3}
+                colSpan={TASK_GROUPS.length + 4}
                 className="py-12 text-center text-sm text-muted-foreground"
               >
                 ไม่มีโปรเจกต์ในสังกัดนี้
@@ -267,10 +293,50 @@ export function ProjectTable({
                       <TooltipContent>Project Details</TooltipContent>
                     </Tooltip>
                   </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground"
+                          aria-label="เมนูการจัดการโปรเจกต์"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            // defer until the menu has closed so the menu's
+                            // focus scope doesn't clash with the dialog's
+                            setTimeout(() => onEditProject(project), 0)
+                          }
+                        >
+                          <Pencil />
+                          Edit Project
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() =>
+                            setTimeout(() => setDeleteTarget(project), 0)
+                          }
+                        >
+                          <Trash2 />
+                          Delete Project
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
                 {isOpen && (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={TASK_GROUPS.length + 3} className="p-0">
+                    <TableCell colSpan={TASK_GROUPS.length + 4} className="p-0">
                       <SubTaskPanel
                         project={project}
                         tasks={projectTasks}
@@ -284,6 +350,43 @@ export function ProjectTable({
           })}
         </TableBody>
       </Table>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent
+          // Don't return focus to the row's menu trigger — it unmounts when
+          // the project is deleted (avoids a Radix focus-scope dispatchEvent crash).
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              project and all associated tasks, timeline data, and financial
+              records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                buttonVariants({ variant: "destructive" }),
+                "bg-destructive text-white hover:bg-destructive/90"
+              )}
+              onClick={() => {
+                if (deleteTarget) onDeleteProject(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

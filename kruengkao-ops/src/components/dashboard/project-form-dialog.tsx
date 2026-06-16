@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, Plus, Sparkles } from "lucide-react";
+import { CalendarDays, Sparkles } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -16,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -36,9 +35,6 @@ import { cn } from "@/lib/utils";
 import { formatFull } from "@/lib/dates";
 import { ARTISTS, LABELS } from "@/lib/mock-data";
 
-// Phase 1: Project Initiation (lean form for Promoters).
-// Budget & Royalty Splits move to a later phase of the flow.
-
 const formSchema = z.object({
   songTitle: z.string().min(1, "กรอกชื่อเพลง"),
   artist: z.string().min(1, "เลือกศิลปินจากรายชื่อ"),
@@ -48,55 +44,86 @@ const formSchema = z.object({
 
 export type NewProjectInput = z.infer<typeof formSchema>;
 
-export function CreateProjectDialog({
-  onCreate,
+const EMPTY: Partial<NewProjectInput> = {
+  songTitle: "",
+  artist: "",
+  label: "",
+  releaseDate: undefined,
+};
+
+/**
+ * Controlled create/edit dialog for a project (Phase 1 fields).
+ * In "edit" mode it pre-populates from `values`.
+ */
+export function ProjectFormDialog({
+  open,
+  onOpenChange,
+  mode,
+  values,
+  onSubmit,
 }: {
-  onCreate: (values: NewProjectInput) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: "create" | "edit";
+  values?: NewProjectInput;
+  onSubmit: (values: NewProjectInput) => void | Promise<void>;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   const form = useForm<NewProjectInput>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      songTitle: "",
-      artist: "",
-      label: "",
-      releaseDate: undefined,
-    },
+    defaultValues: EMPTY,
+    // `values` re-syncs the form whenever the edited project changes.
+    values,
   });
 
   const errors = form.formState.errors;
+  const isSaving = form.formState.isSubmitting;
+  const isEdit = mode === "edit";
 
-  function onSubmit(values: NewProjectInput) {
-    onCreate(values);
-    setOpen(false);
-    form.reset();
+  function handleOpenChange(next: boolean) {
+    if (!next) {
+      setSaveError(null);
+      form.reset(values ?? EMPTY);
+    }
+    onOpenChange(next);
+  }
+
+  async function handleSubmit(formValues: NewProjectInput) {
+    setSaveError(null);
+    try {
+      await onSubmit(formValues);
+      onOpenChange(false);
+      if (!isEdit) form.reset(EMPTY);
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "บันทึกไม่สำเร็จ ลองอีกครั้ง"
+      );
+    }
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) form.reset();
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button>
-          <Plus data-icon="inline-start" />
-          Create Project
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {/* preventDefault on close-auto-focus: when opened from the row's
+          dropdown menu, the menu trigger may unmount, so returning focus to
+          it would crash Radix's focus scope (reading 'dispatchEvent'). */}
+      <DialogContent
+        className="sm:max-w-md"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
-          <DialogTitle>Initiate New Release (Phase 1)</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Edit Project" : "Initiate New Release (Phase 1)"}
+          </DialogTitle>
           <DialogDescription>
-            ข้อมูลตั้งต้นโปรเจกต์ — ระบบจะ Generate Workback Timeline ให้ทันที
+            {isEdit
+              ? "แก้ไขข้อมูลโปรเจกต์ — Workback Timeline จะคำนวณเดดไลน์ใหม่ตามวันปล่อย"
+              : "ข้อมูลตั้งต้นโปรเจกต์ — ระบบจะ Generate Workback Timeline ให้ทันที"}
           </DialogDescription>
         </DialogHeader>
 
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={form.handleSubmit(handleSubmit)}
           className="space-y-6"
           noValidate
         >
@@ -192,7 +219,9 @@ export function CreateProjectDialog({
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
-                        disabled={{ before: new Date() }}
+                        // Only block past dates when creating; an existing
+                        // release may already be near/at its date.
+                        disabled={isEdit ? undefined : { before: new Date() }}
                         autoFocus
                       />
                     </PopoverContent>
@@ -203,15 +232,25 @@ export function CreateProjectDialog({
             </Field>
           </FieldGroup>
 
+          {saveError && (
+            <p className="text-sm text-destructive" role="alert">
+              {saveError}
+            </p>
+          )}
+
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="ghost">
+              <Button type="button" variant="ghost" disabled={isSaving}>
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit">
-              <Sparkles data-icon="inline-start" />
-              Create Project & Generate Timeline
+            <Button type="submit" disabled={isSaving}>
+              {!isEdit && <Sparkles data-icon="inline-start" />}
+              {isSaving
+                ? "Saving…"
+                : isEdit
+                  ? "Save Changes"
+                  : "Create Project & Generate Timeline"}
             </Button>
           </DialogFooter>
         </form>
