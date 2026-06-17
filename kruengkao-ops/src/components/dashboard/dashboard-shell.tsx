@@ -22,7 +22,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { parseDate, toISODate } from "@/lib/dates";
-import { LABELS, LABEL_FILTER_ALL } from "@/lib/mock-data";
+import { LABELS } from "@/lib/constants";
+import { LABEL_FILTER_ALL } from "@/lib/mock-data";
 import type { Project, Task } from "@/lib/types";
 import { createProject } from "@/app/actions";
 import { GanttChart } from "./gantt-chart";

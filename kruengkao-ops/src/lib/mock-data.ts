@@ -269,19 +269,7 @@ export const TASK_GROUPS: TaskGroup[] = [
   "TEASER & MV",
 ];
 
-// Artist roster — the Foolproof form only allows picking from this list
-// (Blueprint Part 2.2: ห้ามพิมพ์ชื่อศิลปินเอง)
-export const ARTISTS = [
-  "AYLA's",
-  "Only Monday",
-  "Tilly Birds",
-  "ASIA7",
-  "Three Man Down",
-  "The Darkest Romance",
-] as const;
-
-// Labels under บริษัท ครึ่งเก้า
-export const LABELS = ["BRIDGE", "MACHg", "9Arkkhan"] as const;
+// Label / Artist master data now lives in lib/constants.ts (LABEL_ARTISTS_DATA).
 
 // Sentinel for the global header filter ("show every label")
 export const LABEL_FILTER_ALL = "Select All";

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarDays, Sparkles } from "lucide-react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatFull } from "@/lib/dates";
-import { ARTISTS, LABELS } from "@/lib/mock-data";
+import { LABELS, artistsForLabel } from "@/lib/constants";
 
 const formSchema = z.object({
   songTitle: z.string().min(1, "กรอกชื่อเพลง"),
@@ -80,6 +80,19 @@ export function ProjectFormDialog({
   const errors = form.formState.errors;
   const isSaving = form.formState.isSubmitting;
   const isEdit = mode === "edit";
+
+  // Dependent dropdown: artist options follow the selected label.
+  const selectedLabel = useWatch({ control: form.control, name: "label" });
+  const selectedArtist = useWatch({ control: form.control, name: "artist" });
+  const artistOptions = React.useMemo(() => {
+    const list = artistsForLabel(selectedLabel ?? "");
+    // Keep an already-saved artist visible even if it's not in the master
+    // list (legacy data), so the Edit form shows the current value.
+    if (selectedArtist && !list.includes(selectedArtist)) {
+      return [selectedArtist, ...list];
+    }
+    return list;
+  }, [selectedLabel, selectedArtist]);
 
   function handleOpenChange(next: boolean) {
     if (!next) {
@@ -139,39 +152,22 @@ export function ProjectFormDialog({
               <FieldError errors={[errors.songTitle]} />
             </Field>
 
-            <Field data-invalid={!!errors.artist}>
-              <FieldLabel>Artist Name</FieldLabel>
-              <Controller
-                control={form.control}
-                name="artist"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger
-                      className="w-full"
-                      aria-invalid={!!errors.artist}
-                    >
-                      <SelectValue placeholder="เลือกศิลปิน" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ARTISTS.map((artist) => (
-                        <SelectItem key={artist} value={artist}>
-                          {artist}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[errors.artist]} />
-            </Field>
-
             <Field data-invalid={!!errors.label}>
               <FieldLabel>Label</FieldLabel>
               <Controller
                 control={form.control}
                 name="label"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(next) => {
+                      if (next !== field.value) {
+                        // Force a valid artist for the new label
+                        form.setValue("artist", "", { shouldValidate: false });
+                      }
+                      field.onChange(next);
+                    }}
+                  >
                     <SelectTrigger
                       className="w-full"
                       aria-invalid={!!errors.label}
@@ -189,6 +185,40 @@ export function ProjectFormDialog({
                 )}
               />
               <FieldError errors={[errors.label]} />
+            </Field>
+
+            <Field data-invalid={!!errors.artist}>
+              <FieldLabel>Artist Name</FieldLabel>
+              <Controller
+                control={form.control}
+                name="artist"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={!selectedLabel}
+                  >
+                    <SelectTrigger
+                      className="w-full"
+                      aria-invalid={!!errors.artist}
+                    >
+                      <SelectValue
+                        placeholder={
+                          selectedLabel ? "เลือกศิลปิน" : "เลือกสังกัดก่อน"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {artistOptions.map((artist) => (
+                        <SelectItem key={artist} value={artist}>
+                          {artist}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError errors={[errors.artist]} />
             </Field>
 
             <Field data-invalid={!!errors.releaseDate}>
