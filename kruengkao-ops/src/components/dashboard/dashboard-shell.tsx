@@ -25,7 +25,14 @@ import { parseDate, toISODate } from "@/lib/dates";
 import { LABELS } from "@/lib/constants";
 import { LABEL_FILTER_ALL } from "@/lib/mock-data";
 import type { Project, Task } from "@/lib/types";
-import { createProject } from "@/app/actions";
+import { toast } from "sonner";
+
+import {
+  createProject,
+  deleteProject,
+  updateProject,
+  updateTask,
+} from "@/app/actions";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
 import {
@@ -64,30 +71,31 @@ export function DashboardShell({
     setTasks((prev) => [...prev, ...newTasks]);
   }
 
-  // Edit / Delete — local state only for now (Supabase wiring comes next).
-  function handleUpdateProject(values: NewProjectInput) {
+  // Persist the edit to Supabase, then reconcile local state with the
+  // authoritative row it returns. Throws on failure so the dialog stays open.
+  async function handleUpdateProject(values: NewProjectInput) {
     if (!editProject) return;
-    const id = editProject.id;
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              songName: values.songTitle,
-              artistName: values.artist,
-              label: values.label,
-              releaseDate: toISODate(values.releaseDate),
-            }
-          : p
-      )
-    );
-    setEditProject(null);
+    const updated = await updateProject({
+      id: editProject.id,
+      songTitle: values.songTitle,
+      artist: values.artist,
+      label: values.label,
+      releaseDate: toISODate(values.releaseDate),
+    });
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }
 
-  function handleDeleteProject(id: string) {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    setTasks((prev) => prev.filter((t) => t.projectId !== id));
-    setDetailsProject((prev) => (prev?.id === id ? null : prev));
+  // Delete in Supabase first (tasks/expenses/splits cascade), then drop it
+  // from local state so the UI reflects the true DB state.
+  async function handleDeleteProject(id: string) {
+    try {
+      await deleteProject(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      setTasks((prev) => prev.filter((t) => t.projectId !== id));
+      setDetailsProject((prev) => (prev?.id === id ? null : prev));
+    } catch (err) {
+      console.error("Failed to delete project", err);
+    }
   }
 
   // Project → form values for the edit dialog (releaseDate string → Date)
@@ -100,12 +108,38 @@ export function DashboardShell({
       }
     : undefined;
 
-  // Patch a single sub-task; pack roll-ups recompute from this state on render
+  // Patch a single sub-task with an optimistic update, persist in the
+  // background, and roll back + toast if the Supabase write fails.
   const handleTaskUpdate = React.useCallback(
     (taskId: string, patch: Partial<Task>) => {
+      // Capture the pre-change task (via the functional updater) for rollback.
+      let previous: Task | undefined;
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t))
+        prev.map((t) => {
+          if (t.id === taskId) {
+            previous = t;
+            return { ...t, ...patch };
+          }
+          return t;
+        })
       );
+
+      updateTask(taskId, {
+        status: patch.status,
+        role: patch.role,
+        person: patch.person,
+      }).catch((err) => {
+        console.error("Failed to update task", err);
+        if (previous) {
+          const restore = previous;
+          setTasks((cur) =>
+            cur.map((t) => (t.id === taskId ? restore : t))
+          );
+        }
+        toast.error("บันทึกการเปลี่ยนแปลงไม่สำเร็จ", {
+          description: "เปลี่ยนกลับเป็นค่าเดิมแล้ว — กรุณาลองอีกครั้ง",
+        });
+      });
     },
     []
   );

@@ -84,3 +84,74 @@ export async function createProject(
     tasks: (insertedTasks as TaskRow[]).map(mapTask),
   };
 }
+
+export interface UpdateProjectInput extends CreateProjectInput {
+  id: string;
+}
+
+/** Update a project's Phase 1 fields, returning the updated row. */
+export async function updateProject(
+  input: UpdateProjectInput
+): Promise<Project> {
+  const supabase = await createClient();
+
+  const { data: projectRow, error } = await supabase
+    .from("projects")
+    .update({
+      song_title: input.songTitle,
+      artist: input.artist,
+      label: input.label,
+      release_date: input.releaseDate,
+    })
+    .eq("id", input.id)
+    .select(PROJECT_COLS)
+    .single();
+
+  if (error || !projectRow) {
+    throw new Error(error?.message ?? "Failed to update project");
+  }
+
+  revalidatePath("/");
+  return mapProject(projectRow as ProjectRow);
+}
+
+export interface UpdateTaskInput {
+  status?: string;
+  role?: string;
+  person?: string; // maps to assigned_to ("" => null/unassigned)
+}
+
+/** Persist a single sub-task's status / assignment changes. */
+export async function updateTask(
+  id: string,
+  patch: UpdateTaskInput
+): Promise<void> {
+  const payload: Record<string, string | null> = {};
+  if (patch.status !== undefined) payload.status = patch.status;
+  if (patch.role !== undefined) payload.role = patch.role;
+  if (patch.person !== undefined) payload.assigned_to = patch.person || null;
+
+  if (Object.keys(payload).length === 0) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("tasks").update(payload).eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+/** Delete a project; tasks/expenses/splits cascade via the FK constraints. */
+export async function deleteProject(id: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("projects").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
