@@ -131,7 +131,42 @@ function SubTaskRow({
   );
 }
 
-/** Expanded panel under a project row: sub-tasks grouped by pack */
+/** A single task-category card: header + its sub-task rows */
+function GroupCard({
+  title,
+  groupTasks,
+  project,
+  allTasks,
+  onTaskUpdate,
+}: {
+  title: TaskGroup;
+  groupTasks: Task[];
+  project: Project;
+  allTasks: Task[];
+  onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+}) {
+  return (
+    <div className="h-fit overflow-hidden rounded-lg border bg-background">
+      <div className="flex items-center justify-between border-b px-3 py-2">
+        <span className="text-sm font-medium">{title}</span>
+        <StatusBadge status={packStatus(groupTasks)} />
+      </div>
+      <div className="divide-y">
+        {groupTasks.map((task) => (
+          <SubTaskRow
+            key={task.id}
+            task={task}
+            project={project}
+            allTasks={allTasks}
+            onTaskUpdate={onTaskUpdate}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Expanded panel under a project row: two explicit side-by-side columns */
 function SubTaskPanel({
   project,
   tasks,
@@ -141,30 +176,36 @@ function SubTaskPanel({
   tasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
 }) {
+  // Split the tasks into the two categories up front (no shared loop) so the
+  // left/right column structure is explicit and guaranteed.
+  const digitalTasks = tasks.filter((t) => t.group === "Digital Distribution Pack");
+  const teaserTasks = tasks.filter((t) => t.group === "TEASER & MV");
+
   return (
-    <div className="grid gap-3 bg-muted/40 p-4 lg:grid-cols-2">
-      {TASK_GROUPS.map((group: TaskGroup) => {
-        const groupTasks = tasks.filter((t) => t.group === group);
-        return (
-          <div key={group} className="rounded-lg border bg-background">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-sm font-medium">{group}</span>
-              <StatusBadge status={packStatus(groupTasks)} />
-            </div>
-            <div className="divide-y">
-              {groupTasks.map((task) => (
-                <SubTaskRow
-                  key={task.id}
-                  task={task}
-                  project={project}
-                  allTasks={tasks}
-                  onTaskUpdate={onTaskUpdate}
-                />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+    <div className="bg-muted/40 p-4">
+      <div className="grid w-full grid-cols-1 items-start gap-8 md:grid-cols-2">
+        {/* LEFT COLUMN — Digital Distribution Pack */}
+        <div>
+          <GroupCard
+            title="Digital Distribution Pack"
+            groupTasks={digitalTasks}
+            project={project}
+            allTasks={tasks}
+            onTaskUpdate={onTaskUpdate}
+          />
+        </div>
+
+        {/* RIGHT COLUMN — TEASER & MV */}
+        <div>
+          <GroupCard
+            title="TEASER & MV"
+            groupTasks={teaserTasks}
+            project={project}
+            allTasks={tasks}
+            onTaskUpdate={onTaskUpdate}
+          />
+        </div>
+      </div>
     </div>
   );
 }
