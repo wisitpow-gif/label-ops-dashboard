@@ -1,30 +1,34 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ChartGantt,
   Disc3,
   ListFilter,
   Plus,
+  Settings,
   SquareKanban,
   Table2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { parseDate, toISODate } from "@/lib/dates";
-import { LABELS } from "@/lib/constants";
-import { LABEL_FILTER_ALL } from "@/lib/mock-data";
-import type { Project, Task } from "@/lib/types";
+import { PROJECT_TYPES } from "@/lib/constants";
+import type { Project, ProjectType, Task } from "@/lib/types";
 import { toast } from "sonner";
 
 import {
@@ -54,8 +58,10 @@ export function DashboardShell({
   const [detailsProject, setDetailsProject] = React.useState<Project | null>(
     null
   );
-  const [selectedLabel, setSelectedLabel] =
-    React.useState<string>(LABEL_FILTER_ALL);
+  // Multi-select project-type filter — all types shown by default.
+  const [selectedTypes, setSelectedTypes] = React.useState<Set<ProjectType>>(
+    () => new Set(PROJECT_TYPES)
+  );
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editProject, setEditProject] = React.useState<Project | null>(null);
 
@@ -65,6 +71,7 @@ export function DashboardShell({
       songTitle: values.songTitle,
       artist: values.artist,
       label: values.label,
+      projectType: values.projectType,
       releaseDate: toISODate(values.releaseDate),
     });
     setProjects((prev) => [...prev, project]);
@@ -104,6 +111,7 @@ export function DashboardShell({
         songTitle: editProject.songName,
         artist: editProject.artistName,
         label: editProject.label,
+        projectType: editProject.projectType,
         releaseDate: parseDate(editProject.releaseDate),
       }
     : undefined;
@@ -150,14 +158,21 @@ export function DashboardShell({
     [projects]
   );
 
-  // Global label filter — drives both the Project View and the Gantt Chart
+  // Project-type filter — drives the Project View, Gantt, and Kanban.
   const filteredProjects = React.useMemo(
-    () =>
-      selectedLabel === LABEL_FILTER_ALL
-        ? sortedProjects
-        : sortedProjects.filter((p) => p.label === selectedLabel),
-    [sortedProjects, selectedLabel]
+    () => sortedProjects.filter((p) => selectedTypes.has(p.projectType)),
+    [sortedProjects, selectedTypes]
   );
+
+  const toggleType = (type: ProjectType) =>
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+
+  const allTypesSelected = selectedTypes.size === PROJECT_TYPES.length;
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -177,25 +192,48 @@ export function DashboardShell({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={selectedLabel} onValueChange={setSelectedLabel}>
-              <SelectTrigger className="w-[180px]" aria-label="กรองตามสังกัด">
-                <ListFilter className="size-4 text-muted-foreground" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={LABEL_FILTER_ALL}>{LABEL_FILTER_ALL}</SelectItem>
-                <SelectSeparator />
-                {LABELS.map((label) => (
-                  <SelectItem key={label} value={label}>
-                    {label}
-                  </SelectItem>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" aria-label="กรองตามประเภทโปรเจกต์">
+                  <ListFilter data-icon="inline-start" />
+                  Project Types
+                  <span className="ml-1 rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">
+                    {allTypesSelected ? "All" : selectedTypes.size}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-52 p-2">
+                <div className="px-1 pb-1.5 text-xs font-medium text-muted-foreground">
+                  Show project types
+                </div>
+                {PROJECT_TYPES.map((type) => (
+                  <label
+                    key={type}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-sm hover:bg-accent"
+                  >
+                    <Checkbox
+                      checked={selectedTypes.has(type)}
+                      onCheckedChange={() => toggleType(type)}
+                    />
+                    {type}
+                  </label>
                 ))}
-              </SelectContent>
-            </Select>
+              </PopoverContent>
+            </Popover>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus data-icon="inline-start" />
               Create Project
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="icon" aria-label="Workflow Templates">
+                  <Link href="/settings/templates">
+                    <Settings />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Workflow Templates</TooltipContent>
+            </Tooltip>
           </div>
         </header>
 
