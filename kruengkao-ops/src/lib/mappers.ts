@@ -1,4 +1,11 @@
-import type { Project, Task, TaskGroup, TaskStatus } from "./types";
+import type {
+  Project,
+  ProjectType,
+  Task,
+  TaskGroup,
+  TaskStatus,
+  TaskTemplate,
+} from "./types";
 
 // Shapes of the rows returned by Supabase (snake_case columns).
 export interface ProjectRow {
@@ -6,6 +13,7 @@ export interface ProjectRow {
   song_title: string;
   artist: string;
   label: string;
+  project_type: string;
   release_date: string; // yyyy-mm-dd
 }
 
@@ -28,7 +36,34 @@ export function mapProject(row: ProjectRow): Project {
     songName: row.song_title,
     artistName: row.artist,
     label: row.label,
+    projectType: (row.project_type as ProjectType) ?? "Single",
     releaseDate: row.release_date,
+  };
+}
+
+export interface TaskTemplateRow {
+  id: string;
+  project_type: string;
+  task_key: string;
+  category: string;
+  task_name: string;
+  role: string;
+  t_minus_days: number;
+  duration_days: number;
+  sort_order: number;
+}
+
+export function mapTaskTemplate(row: TaskTemplateRow): TaskTemplate {
+  return {
+    id: row.id,
+    projectType: row.project_type as ProjectType,
+    taskKey: row.task_key,
+    category: row.category,
+    taskName: row.task_name,
+    role: row.role,
+    tMinusDays: row.t_minus_days,
+    durationDays: row.duration_days,
+    sortOrder: row.sort_order,
   };
 }
 

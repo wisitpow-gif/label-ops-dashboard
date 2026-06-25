@@ -5,6 +5,21 @@ export type TaskStatus = "Not Start" | "WIP" | "Done" | "Blocked";
 
 export type TaskGroup = "Digital Distribution Pack" | "TEASER & MV";
 
+export type ProjectType = "Single" | "Album" | "Live Session" | "Other";
+
+/** A configurable task-template row (maps to the task_templates table). */
+export interface TaskTemplate {
+  id: string;
+  projectType: ProjectType;
+  taskKey: string;
+  category: string;
+  taskName: string;
+  role: string;
+  tMinusDays: number;
+  durationDays: number;
+  sortOrder: number;
+}
+
 export interface Task {
   id: string;
   projectId: string;
@@ -62,6 +77,8 @@ export interface Project {
   artistName: string;
   /** Label / sub-label the release belongs to */
   label: string;
+  /** Workflow type — drives which task template generates its tasks */
+  projectType: ProjectType;
   /** ISO date string yyyy-mm-dd */
   releaseDate: string;
 }

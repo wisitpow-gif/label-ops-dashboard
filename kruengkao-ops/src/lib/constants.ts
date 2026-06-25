@@ -39,6 +39,31 @@ export const LABEL_ARTISTS_DATA: Record<string, string[]> = {
 // Canonical label list (order preserved from the master data).
 export const LABELS = Object.keys(LABEL_ARTISTS_DATA);
 
+// Project types (mirrors the projects.project_type CHECK / task_templates).
+export const PROJECT_TYPES = [
+  "Single",
+  "Album",
+  "Live Session",
+  "Other",
+] as const;
+
+// Task categories available in the template editor.
+export const TEMPLATE_CATEGORIES = [
+  "Digital Distribution Pack",
+  "TEASER & MV",
+] as const;
+
+// Assignable roles for a template's default owner.
+export const TEMPLATE_ROLES = [
+  "Unassigned",
+  "Promoter",
+  "Creative/MarCom",
+  "Graphics",
+  "Producer",
+  "Digital",
+  "Distributor",
+] as const;
+
 /** Artists belonging to a label ([] if the label is unknown/unset). */
 export function artistsForLabel(label: string): string[] {
   return LABEL_ARTISTS_DATA[label] ?? [];

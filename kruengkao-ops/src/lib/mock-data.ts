@@ -42,67 +42,7 @@ export function initialsOf(name: string): string {
   return name ? name.slice(0, 2).toUpperCase() : "";
 }
 
-// Exact release schedule extracted from the label's spreadsheet.
-export const PROJECTS: Project[] = [
-  {
-    id: "1",
-    songName: "Single Player",
-    artistName: "NINEOKMAI",
-    label: "BRIDGE",
-    releaseDate: "2026-07-07",
-  },
-  {
-    id: "2",
-    songName: "จำเลย",
-    artistName: "Tilly Birds",
-    label: "BRIDGE",
-    releaseDate: "2026-07-14",
-  },
-  {
-    id: "3",
-    songName: "OST. คำสารภาพของหมอผี",
-    artistName: "ปราง ปรางทิพย์",
-    label: "MACHg",
-    releaseDate: "2026-07-23",
-  },
-  {
-    id: "4",
-    songName: "ลืมลบเลือน",
-    artistName: "Hard Boy",
-    label: "BRIDGE",
-    releaseDate: "2026-08-04",
-  },
-  {
-    id: "5",
-    songName: "วัฏสงสาร",
-    artistName: "TaitosmitH Feat. PINKIE",
-    label: "9Arkkhan",
-    releaseDate: "2026-08-13",
-  },
-  {
-    id: "6",
-    songName: "คะนึงนิตย์",
-    artistName: "ปราง ปรางทิพย์",
-    label: "MACHg",
-    releaseDate: "2026-08-20",
-  },
-  {
-    id: "7",
-    songName: "เพลงกัลยา",
-    artistName: "ASIA7",
-    label: "BRIDGE",
-    releaseDate: "2026-08-25",
-  },
-  {
-    id: "8",
-    songName: "หนุ่ม ปริญวัฒน์ S.1",
-    artistName: "หนุ่ม ปริญวัฒน์",
-    label: "MACHg",
-    releaseDate: "2026-09-03",
-  },
-];
-
-export interface TaskTemplate {
+interface TaskTemplate {
   key: string;
   group: TaskGroup;
   name: string;

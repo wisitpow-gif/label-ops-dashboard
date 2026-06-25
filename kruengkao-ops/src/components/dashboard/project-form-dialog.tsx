@@ -33,12 +33,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatFull } from "@/lib/dates";
-import { LABELS, artistsForLabel } from "@/lib/constants";
+import { LABELS, PROJECT_TYPES, artistsForLabel } from "@/lib/constants";
 
 const formSchema = z.object({
   songTitle: z.string().min(1, "กรอกชื่อเพลง"),
   artist: z.string().min(1, "เลือกศิลปินจากรายชื่อ"),
   label: z.string().min(1, "เลือกสังกัด"),
+  projectType: z.string().min(1, "เลือกประเภทโปรเจกต์"),
   releaseDate: z.date({ message: "เลือกวันปล่อยเพลง" }),
 });
 
@@ -48,6 +49,7 @@ const EMPTY: Partial<NewProjectInput> = {
   songTitle: "",
   artist: "",
   label: "",
+  projectType: "Single",
   releaseDate: undefined,
 };
 
@@ -141,6 +143,34 @@ export function ProjectFormDialog({
           noValidate
         >
           <FieldGroup>
+            {!isEdit && (
+              <Field data-invalid={!!errors.projectType}>
+                <FieldLabel>Project Type</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="projectType"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger
+                        className="w-full"
+                        aria-invalid={!!errors.projectType}
+                      >
+                        <SelectValue placeholder="เลือกประเภทโปรเจกต์" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROJECT_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError errors={[errors.projectType]} />
+              </Field>
+            )}
+
             <Field data-invalid={!!errors.songTitle}>
               <FieldLabel htmlFor="songTitle">Song Title</FieldLabel>
               <Input
