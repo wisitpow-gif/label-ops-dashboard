@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  FolderOpen,
   Link2,
   MoreHorizontal,
   Pencil,
@@ -45,7 +46,7 @@ import { formatFull, formatShort, parseDate, startOfToday } from "@/lib/dates";
 import { TASK_GROUPS, packStatus, taskDeadline } from "@/lib/mock-data";
 import type { Project, Task, TaskGroup } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
-import { AssigneeSelect, StatusSelect } from "./task-controls";
+import { AssetLinkControl, AssigneeSelect, StatusSelect } from "./task-controls";
 
 /** Pack-level summary cell: rolled-up status + done/total progress */
 function PackCell({ tasks }: { tasks: Task[] }) {
@@ -103,10 +104,16 @@ function SubTaskRow({
             </Tooltip>
           )}
         </div>
-        <StatusSelect
-          value={task.status}
-          onChange={(status) => onTaskUpdate(task.id, { status })}
-        />
+        <div className="flex shrink-0 items-center gap-1">
+          <AssetLinkControl
+            value={task.assetUrl ?? ""}
+            onChange={(assetUrl) => onTaskUpdate(task.id, { assetUrl })}
+          />
+          <StatusSelect
+            value={task.status}
+            onChange={(status) => onTaskUpdate(task.id, { status })}
+          />
+        </div>
       </div>
       <div className="flex items-center justify-between gap-2">
         <div
@@ -214,6 +221,7 @@ export function ProjectTable({
   projects,
   tasks,
   onOpenDetails,
+  onOpenAssets,
   onTaskUpdate,
   onEditProject,
   onDeleteProject,
@@ -221,6 +229,7 @@ export function ProjectTable({
   projects: Project[];
   tasks: Task[];
   onOpenDetails: (project: Project) => void;
+  onOpenAssets: (project: Project) => void;
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
@@ -251,7 +260,7 @@ export function ProjectTable({
               </TableHead>
             ))}
             <TableHead className="w-12" />
-            <TableHead className="w-12" />
+            <TableHead className="w-20" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -335,18 +344,36 @@ export function ProjectTable({
                     </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 text-muted-foreground"
-                          aria-label="เมนูการจัดการโปรเจกต์"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground"
+                            aria-label="Asset Hub"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenAssets(project);
+                            }}
+                          >
+                            <FolderOpen className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Asset Hub</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground"
+                            aria-label="เมนูการจัดการโปรเจกต์"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
                         onClick={(e) => e.stopPropagation()}
@@ -373,6 +400,7 @@ export function ProjectTable({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
                 {isOpen && (

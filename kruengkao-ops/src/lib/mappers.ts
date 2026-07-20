@@ -27,6 +27,7 @@ export interface TaskRow {
   status: string;
   t_minus_days: number;
   duration_days: number;
+  asset_url: string | null;
   blocked_by: string | null;
 }
 
@@ -78,6 +79,7 @@ export function mapTask(row: TaskRow): Task {
     status: row.status as TaskStatus,
     role: row.role,
     person: row.assigned_to ?? "",
+    assetUrl: row.asset_url ?? undefined,
     blockedBy: row.blocked_by ?? undefined,
   };
 }

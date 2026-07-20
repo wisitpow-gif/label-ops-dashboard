@@ -13,7 +13,7 @@ import type { Project, Task, TaskTemplate } from "@/lib/types";
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const TASK_COLS =
-  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, blocked_by";
+  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, asset_url, blocked_by";
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 
@@ -27,7 +27,9 @@ export async function getDashboardData(): Promise<{
 
   const [projectsRes, tasksRes] = await Promise.all([
     supabase.from("projects").select(PROJECT_COLS).order("release_date"),
-    supabase.from("tasks_with_schedule").select(TASK_COLS).order("sort_order"),
+    // Base table (not tasks_with_schedule) — the app derives deadlines itself,
+    // and the view's `select t.*` won't include newly added columns.
+    supabase.from("tasks").select(TASK_COLS).order("sort_order"),
   ]);
 
   if (projectsRes.error) throw new Error(projectsRes.error.message);
