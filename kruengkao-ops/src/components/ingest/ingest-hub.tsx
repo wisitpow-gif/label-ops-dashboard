@@ -12,11 +12,22 @@ import {
   RotateCcw,
   Send,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -40,6 +51,7 @@ import { cn } from "@/lib/utils";
 import { formatFull, parseDate } from "@/lib/dates";
 import {
   createProjectAsset,
+  deleteProjectAsset,
   resubmitProjectAsset,
   reviewProjectAsset,
 } from "@/app/actions";
@@ -376,6 +388,9 @@ export function IngestHub({
   const [reviewTarget, setReviewTarget] = React.useState<ProjectAsset | null>(
     null
   );
+  const [deleteTarget, setDeleteTarget] = React.useState<ProjectAsset | null>(
+    null
+  );
 
   const counts = {
     "Pending Review": assets.filter((a) => a.status === "Pending Review").length,
@@ -423,6 +438,17 @@ export function IngestHub({
     toast.success(
       input.status === "Vaulted" ? "Vaulted เรียบร้อย ✓" : "ส่งกลับให้แก้แล้ว"
     );
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteProjectAsset(id);
+      setAssets((prev) => prev.filter((a) => a.id !== id));
+      toast.success("ลบ Asset แล้ว");
+    } catch (err) {
+      console.error("Failed to delete asset", err);
+      toast.error("ลบไม่สำเร็จ — ลองอีกครั้ง");
+    }
   }
 
   return (
@@ -560,6 +586,15 @@ export function IngestHub({
                               Review
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            aria-label="ลบ Asset"
+                            onClick={() => setDeleteTarget(asset)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
                         </div>
                       </div>
                       {(asset.submitterNote || asset.reviewerNote) && (
@@ -620,6 +655,39 @@ export function IngestHub({
         asset={reviewTarget}
         onReview={handleReview}
       />
+
+      {/* Delete */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this asset?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleteTarget?.assetName}” ({deleteTarget?.providerRole}) will be
+              permanently removed from this project. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                buttonVariants({ variant: "destructive" }),
+                "bg-destructive text-white hover:bg-destructive/90"
+              )}
+              onClick={() => {
+                if (deleteTarget) handleDelete(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
