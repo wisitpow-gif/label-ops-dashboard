@@ -7,6 +7,26 @@ export type TaskGroup = "Digital Distribution Pack" | "TEASER & MV";
 
 export type ProjectType = "Single" | "Album" | "Live Session" | "Other";
 
+// --- DAM: Digital Asset Management ---
+
+export type AssetStatus = "Pending Review" | "Revision" | "Vaulted";
+
+/** One row of project_assets (Ingest Hub → Library). */
+export interface ProjectAsset {
+  id: string;
+  projectId: string;
+  providerRole: string;
+  assetName: string;
+  status: AssetStatus;
+  submittedLink?: string;
+  vaultLink?: string;
+  submitterNote?: string;
+  reviewerNote?: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A configurable task-template row (maps to the task_templates table). */
 export interface TaskTemplate {
   id: string;

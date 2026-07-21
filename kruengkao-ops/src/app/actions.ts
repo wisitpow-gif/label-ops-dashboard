@@ -5,13 +5,18 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   mapProject,
+  mapProjectAsset,
   mapTask,
   mapTaskTemplate,
+  type ProjectAssetRow,
   type ProjectRow,
   type TaskRow,
   type TaskTemplateRow,
 } from "@/lib/mappers";
-import type { Project, Task, TaskTemplate } from "@/lib/types";
+import type { Project, ProjectAsset, Task, TaskTemplate } from "@/lib/types";
+
+const ASSET_COLS =
+  "id, project_id, provider_role, asset_name, status, submitted_link, vault_link, submitter_note, reviewer_note, version, created_at, updated_at";
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const TASK_COLS =
@@ -409,4 +414,124 @@ export async function syncTemplateToProjects(
     inserted: inserts.length,
     updated: updates.length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// DAM — project_assets (Ingest Hub)
+// ---------------------------------------------------------------------------
+
+function revalidateIngest(projectId: string) {
+  revalidatePath(`/projects/${projectId}/ingest`);
+}
+
+export interface CreateAssetInput {
+  projectId: string;
+  providerRole: string;
+  assetName: string;
+  submittedLink: string;
+  submitterNote: string;
+}
+
+/** Creator submits a new asset — starts at "Pending Review", version 1. */
+export async function createProjectAsset(
+  input: CreateAssetInput
+): Promise<ProjectAsset> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_assets")
+    .insert({
+      project_id: input.projectId,
+      provider_role: input.providerRole,
+      asset_name: input.assetName,
+      submitted_link: input.submittedLink || null,
+      submitter_note: input.submitterNote || null,
+      status: "Pending Review",
+      version: 1,
+    })
+    .select(ASSET_COLS)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to submit asset");
+  }
+  revalidateIngest(input.projectId);
+  return mapProjectAsset(data as ProjectAssetRow);
+}
+
+export interface ReviewAssetInput {
+  status: "Vaulted" | "Revision";
+  vaultLink: string;
+  reviewerNote: string;
+}
+
+/** Digital team reviews: approve (Vaulted + vault_link) or reject (Revision). */
+export async function reviewProjectAsset(
+  id: string,
+  input: ReviewAssetInput
+): Promise<ProjectAsset> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_assets")
+    .update({
+      status: input.status,
+      vault_link: input.vaultLink || null,
+      reviewer_note: input.reviewerNote || null,
+    })
+    .eq("id", id)
+    .select(ASSET_COLS)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to review asset");
+  }
+  const asset = mapProjectAsset(data as ProjectAssetRow);
+  revalidateIngest(asset.projectId);
+  return asset;
+}
+
+export interface ResubmitAssetInput {
+  submittedLink: string;
+  submitterNote: string;
+}
+
+/** Creator resubmits a Revision item — back to Pending Review, version + 1. */
+export async function resubmitProjectAsset(
+  id: string,
+  input: ResubmitAssetInput
+): Promise<ProjectAsset> {
+  const supabase = await createClient();
+
+  const { data: current, error: readErr } = await supabase
+    .from("project_assets")
+    .select("version")
+    .eq("id", id)
+    .single();
+  if (readErr || !current) {
+    throw new Error(readErr?.message ?? "Asset not found");
+  }
+
+  const { data, error } = await supabase
+    .from("project_assets")
+    .update({
+      submitted_link: input.submittedLink || null,
+      submitter_note: input.submitterNote || null,
+      status: "Pending Review",
+      version: (current.version as number) + 1,
+    })
+    .eq("id", id)
+    .select(ASSET_COLS)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to resubmit asset");
+  }
+  const asset = mapProjectAsset(data as ProjectAssetRow);
+  revalidateIngest(asset.projectId);
+  return asset;
+}
+
+export async function deleteProjectAsset(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("project_assets").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }

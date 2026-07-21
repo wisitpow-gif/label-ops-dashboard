@@ -1,5 +1,7 @@
 import type {
+  AssetStatus,
   Project,
+  ProjectAsset,
   ProjectType,
   Task,
   TaskGroup,
@@ -51,6 +53,38 @@ export interface TaskTemplateRow {
   t_minus_days: number;
   duration_days: number;
   sort_order: number;
+}
+
+export interface ProjectAssetRow {
+  id: string;
+  project_id: string;
+  provider_role: string;
+  asset_name: string;
+  status: string;
+  submitted_link: string | null;
+  vault_link: string | null;
+  submitter_note: string | null;
+  reviewer_note: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function mapProjectAsset(row: ProjectAssetRow): ProjectAsset {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    providerRole: row.provider_role,
+    assetName: row.asset_name,
+    status: row.status as AssetStatus,
+    submittedLink: row.submitted_link ?? undefined,
+    vaultLink: row.vault_link ?? undefined,
+    submitterNote: row.submitter_note ?? undefined,
+    reviewerNote: row.reviewer_note ?? undefined,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function mapTaskTemplate(row: TaskTemplateRow): TaskTemplate {

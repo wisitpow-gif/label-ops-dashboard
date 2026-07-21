@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
   FileText,
+  Inbox,
   Link2,
   MoreHorizontal,
   Pencil,
@@ -251,7 +253,7 @@ export function ProjectTable({
               </TableHead>
             ))}
             <TableHead className="w-12" />
-            <TableHead className="w-12" />
+            <TableHead className="w-20" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -335,18 +337,36 @@ export function ProjectTable({
                     </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 text-muted-foreground"
-                          aria-label="เมนูการจัดการโปรเจกต์"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground"
+                            aria-label="Ingest Hub"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Link href={`/projects/${project.id}/ingest`}>
+                              <Inbox className="size-4" />
+                            </Link>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ingest Hub</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground"
+                            aria-label="เมนูการจัดการโปรเจกต์"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
                         onClick={(e) => e.stopPropagation()}
@@ -373,6 +393,7 @@ export function ProjectTable({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
                 {isOpen && (
