@@ -1,16 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { Check, ExternalLink, Paperclip, Trash2 } from "lucide-react";
-
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -21,11 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { TEAM_STRUCTURE, UNASSIGNED, initialsOf } from "@/lib/mock-data";
 import type { TaskStatus } from "@/lib/types";
@@ -171,112 +156,5 @@ export function AssigneeSelect({
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-/**
- * Asset/delivery link for a task. Shows a clickable open-in-new-tab icon when
- * a link exists, plus a popover to add / edit / remove it. Empty save clears.
- */
-export function AssetLinkControl({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (url: string) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [draft, setDraft] = React.useState(value);
-
-  const hasLink = value.trim().length > 0;
-
-  function save() {
-    onChange(draft.trim());
-    setOpen(false);
-  }
-
-  return (
-    <div className="flex items-center">
-      {hasLink && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <a
-              href={value}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="เปิดลิงก์งาน (แท็บใหม่)"
-              className="flex size-6 items-center justify-center rounded-md text-blue-600 hover:bg-muted dark:text-blue-400"
-            >
-              <ExternalLink className="size-3.5" />
-            </a>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-60 break-all">{value}</TooltipContent>
-        </Tooltip>
-      )}
-
-      <Popover
-        open={open}
-        onOpenChange={(next) => {
-          if (next) setDraft(value); // re-sync draft when opening
-          setOpen(next);
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "size-6",
-              hasLink ? "text-muted-foreground" : "text-muted-foreground/70"
-            )}
-            aria-label={hasLink ? "แก้ลิงก์งาน" : "เพิ่มลิงก์งาน"}
-          >
-            <Paperclip className="size-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 p-2" sideOffset={4}>
-          <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground">
-            Asset link
-          </p>
-          <div className="flex items-center gap-1.5">
-            <Input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  save();
-                }
-              }}
-              placeholder="https://drive.google.com/…"
-              autoFocus
-              className="h-8 text-sm"
-            />
-            <Button
-              size="icon"
-              className="size-8 shrink-0"
-              aria-label="บันทึกลิงก์"
-              onClick={save}
-            >
-              <Check className="size-4" />
-            </Button>
-            {hasLink && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                aria-label="ลบลิงก์"
-                onClick={() => {
-                  onChange("");
-                  setOpen(false);
-                }}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
   );
 }

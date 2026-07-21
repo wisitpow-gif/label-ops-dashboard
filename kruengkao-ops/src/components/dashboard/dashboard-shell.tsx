@@ -37,7 +37,6 @@ import {
   updateProject,
   updateTask,
 } from "@/app/actions";
-import { AssetHubDialog } from "./asset-hub-dialog";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
 import {
@@ -57,9 +56,6 @@ export function DashboardShell({
   const [projects, setProjects] = React.useState<Project[]>(initialProjects);
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
   const [detailsProject, setDetailsProject] = React.useState<Project | null>(
-    null
-  );
-  const [assetsProject, setAssetsProject] = React.useState<Project | null>(
     null
   );
   // Multi-select project-type filter — all types shown by default.
@@ -140,7 +136,6 @@ export function DashboardShell({
         status: patch.status,
         role: patch.role,
         person: patch.person,
-        assetUrl: patch.assetUrl,
       }).catch((err) => {
         console.error("Failed to update task", err);
         if (previous) {
@@ -262,7 +257,6 @@ export function DashboardShell({
               projects={filteredProjects}
               tasks={tasks}
               onOpenDetails={setDetailsProject}
-              onOpenAssets={setAssetsProject}
               onTaskUpdate={handleTaskUpdate}
               onEditProject={setEditProject}
               onDeleteProject={handleDeleteProject}
@@ -285,14 +279,6 @@ export function DashboardShell({
           tasks={tasks}
           onOpenChange={(open) => {
             if (!open) setDetailsProject(null);
-          }}
-        />
-
-        <AssetHubDialog
-          project={assetsProject}
-          tasks={tasks}
-          onOpenChange={(open) => {
-            if (!open) setAssetsProject(null);
           }}
         />
 

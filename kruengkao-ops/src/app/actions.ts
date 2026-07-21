@@ -15,7 +15,7 @@ import type { Project, Task, TaskTemplate } from "@/lib/types";
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const TASK_COLS =
-  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, asset_url, blocked_by";
+  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, blocked_by";
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 
@@ -139,10 +139,9 @@ export interface UpdateTaskInput {
   status?: string;
   role?: string;
   person?: string; // maps to assigned_to ("" => null/unassigned)
-  assetUrl?: string; // maps to asset_url ("" => null/no link)
 }
 
-/** Persist a single sub-task's status / assignment / asset-link changes. */
+/** Persist a single sub-task's status / assignment changes. */
 export async function updateTask(
   id: string,
   patch: UpdateTaskInput
@@ -151,7 +150,6 @@ export async function updateTask(
   if (patch.status !== undefined) payload.status = patch.status;
   if (patch.role !== undefined) payload.role = patch.role;
   if (patch.person !== undefined) payload.assigned_to = patch.person || null;
-  if (patch.assetUrl !== undefined) payload.asset_url = patch.assetUrl || null;
 
   if (Object.keys(payload).length === 0) return;
 

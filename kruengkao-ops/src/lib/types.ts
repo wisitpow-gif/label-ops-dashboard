@@ -34,8 +34,6 @@ export interface Task {
   role: string;
   /** Specific staff member within the role; "" = nobody chosen yet (tier 2) */
   person: string;
-  /** Delivery/asset link (Drive folder, file, etc.); undefined = none */
-  assetUrl?: string;
   /** Upstream dependency — when that task is late, this one shows as Blocked */
   blockedBy?: string;
 }
