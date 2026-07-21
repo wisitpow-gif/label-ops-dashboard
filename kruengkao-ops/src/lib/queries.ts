@@ -45,6 +45,29 @@ export async function getDashboardData(): Promise<{
   };
 }
 
+/** All projects (lightweight), sorted by release date. */
+export async function getProjects(): Promise<Project[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select(PROJECT_COLS)
+    .order("release_date");
+  if (error) throw new Error(error.message);
+  return (data as ProjectRow[]).map(mapProject);
+}
+
+/** Every Vaulted asset across all projects (Library Map), newest first. */
+export async function getVaultedAssets(): Promise<ProjectAsset[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_assets")
+    .select(ASSET_COLS)
+    .eq("status", "Vaulted")
+    .order("updated_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data as ProjectAssetRow[]).map(mapProjectAsset);
+}
+
 /** A single project by id (null if not found). */
 export async function getProjectById(id: string): Promise<Project | null> {
   const supabase = await createClient();

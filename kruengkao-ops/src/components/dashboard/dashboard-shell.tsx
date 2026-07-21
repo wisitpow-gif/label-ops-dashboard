@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ChartGantt,
   Disc3,
+  Library,
   ListFilter,
   Plus,
   Settings,
@@ -224,6 +225,16 @@ export function DashboardShell({
               <Plus data-icon="inline-start" />
               Create Project
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="icon" aria-label="Library Map">
+                  <Link href="/library">
+                    <Library />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Library Map</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button asChild variant="outline" size="icon" aria-label="Workflow Templates">
