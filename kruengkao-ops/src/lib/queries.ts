@@ -102,6 +102,36 @@ export async function getInternalWorkspace(): Promise<{
   return { projects, tasks, dependencies };
 }
 
+/**
+ * Team Workload payload — EVERY task across ALL work types (Release + Internal)
+ * with their projects and dependency edges. Powers the per-assignee board.
+ */
+export async function getWorkloadData(): Promise<{
+  projects: Project[];
+  tasks: Task[];
+  dependencies: TaskDependency[];
+}> {
+  const supabase = await createClient();
+
+  const [projectsRes, tasksRes, depsRes] = await Promise.all([
+    supabase.from("projects").select(PROJECT_COLS),
+    supabase.from("tasks").select(TASK_COLS).order("created_at", { ascending: true }),
+    supabase
+      .from("task_dependencies")
+      .select("id, task_id, depends_on_task_id"),
+  ]);
+
+  if (projectsRes.error) throw new Error(projectsRes.error.message);
+  if (tasksRes.error) throw new Error(tasksRes.error.message);
+  if (depsRes.error) throw new Error(depsRes.error.message);
+
+  return {
+    projects: (projectsRes.data as ProjectRow[]).map(mapProject),
+    tasks: (tasksRes.data as TaskRow[]).map(mapTask),
+    dependencies: (depsRes.data as TaskDependencyRow[]).map(mapTaskDependency),
+  };
+}
+
 /** All projects (lightweight), sorted by release date. */
 export async function getProjects(): Promise<Project[]> {
   const supabase = await createClient();

@@ -12,6 +12,7 @@ import {
   Settings,
   SquareKanban,
   Table2,
+  Users,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -226,6 +227,16 @@ export function DashboardShell({
               <Plus data-icon="inline-start" />
               Create Project
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="icon" aria-label="Team Workload">
+                  <Link href="/workload">
+                    <Users />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Team Workload</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button asChild variant="outline" size="icon" aria-label="Internal Work">
