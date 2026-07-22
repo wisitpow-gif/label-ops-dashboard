@@ -31,9 +31,14 @@ const STATUS_DOT: Record<TaskStatus, string> = {
 export function StatusSelect({
   value,
   onChange,
+  disableDone = false,
+  disableDoneReason,
 }: {
   value: TaskStatus;
   onChange: (next: TaskStatus) => void;
+  /** Hard gate — prevent selecting "Done" while prerequisites are unmet */
+  disableDone?: boolean;
+  disableDoneReason?: string;
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as TaskStatus)}>
@@ -51,14 +56,22 @@ export function StatusSelect({
       {/* popper anchors to the trigger — item-aligned mis-positions inside
           the scrollable table (renders at the top-left of the page) */}
       <SelectContent position="popper" align="end" sideOffset={4}>
-        {STATUS_OPTIONS.map((s) => (
-          <SelectItem key={s} value={s}>
-            <span className="flex items-center gap-2">
-              <span className={cn("size-2 rounded-full", STATUS_DOT[s])} />
-              {STATUS_LABELS[s]}
-            </span>
-          </SelectItem>
-        ))}
+        {STATUS_OPTIONS.map((s) => {
+          const locked = s === "Done" && disableDone;
+          return (
+            <SelectItem key={s} value={s} disabled={locked}>
+              <span className="flex items-center gap-2">
+                <span className={cn("size-2 rounded-full", STATUS_DOT[s])} />
+                {STATUS_LABELS[s]}
+                {locked && disableDoneReason && (
+                  <span className="text-xs text-muted-foreground">
+                    — {disableDoneReason}
+                  </span>
+                )}
+              </span>
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

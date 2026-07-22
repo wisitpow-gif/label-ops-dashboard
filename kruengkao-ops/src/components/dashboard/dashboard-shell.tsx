@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   ChartGantt,
+  ClipboardList,
   Disc3,
   Library,
   ListFilter,
@@ -225,6 +226,16 @@ export function DashboardShell({
               <Plus data-icon="inline-start" />
               Create Project
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="icon" aria-label="Internal Work">
+                  <Link href="/internal">
+                    <ClipboardList />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Internal / Ad-Hoc Work</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button asChild variant="outline" size="icon" aria-label="Library Map">

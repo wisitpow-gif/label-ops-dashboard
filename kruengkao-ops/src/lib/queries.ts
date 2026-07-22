@@ -5,17 +5,26 @@ import {
   mapProject,
   mapProjectAsset,
   mapTask,
+  mapTaskDependency,
   mapTaskTemplate,
   type ProjectAssetRow,
   type ProjectRow,
+  type TaskDependencyRow,
   type TaskRow,
   type TaskTemplateRow,
 } from "@/lib/mappers";
-import type { Project, ProjectAsset, Task, TaskTemplate } from "@/lib/types";
+import type {
+  Project,
+  ProjectAsset,
+  Task,
+  TaskDependency,
+  TaskTemplate,
+} from "@/lib/types";
 
-const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
+const PROJECT_COLS =
+  "id, song_title, artist, label, project_type, work_type, release_date, target_date";
 const TASK_COLS =
-  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, blocked_by";
+  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, blocked_by";
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 const ASSET_COLS =
@@ -30,7 +39,12 @@ export async function getDashboardData(): Promise<{
   const supabase = await createClient();
 
   const [projectsRes, tasksRes] = await Promise.all([
-    supabase.from("projects").select(PROJECT_COLS).order("release_date"),
+    // Release dashboard shows only Release projects; Internal work lives in /internal.
+    supabase
+      .from("projects")
+      .select(PROJECT_COLS)
+      .eq("work_type", "Release")
+      .order("release_date"),
     // Base table (not tasks_with_schedule) — the app derives deadlines itself,
     // and the view's `select t.*` won't include newly added columns.
     supabase.from("tasks").select(TASK_COLS).order("sort_order"),
@@ -43,6 +57,49 @@ export async function getDashboardData(): Promise<{
     projects: (projectsRes.data as ProjectRow[]).map(mapProject),
     tasks: (tasksRes.data as TaskRow[]).map(mapTask),
   };
+}
+
+/** Internal/Ad-Hoc workspace: internal projects + their tasks + dependencies. */
+export async function getInternalWorkspace(): Promise<{
+  projects: Project[];
+  tasks: Task[];
+  dependencies: TaskDependency[];
+}> {
+  const supabase = await createClient();
+
+  const { data: projData, error: projErr } = await supabase
+    .from("projects")
+    .select(PROJECT_COLS)
+    .eq("work_type", "Internal")
+    .order("created_at", { ascending: false });
+  if (projErr) throw new Error(projErr.message);
+  const projects = (projData as ProjectRow[]).map(mapProject);
+
+  if (projects.length === 0) {
+    return { projects: [], tasks: [], dependencies: [] };
+  }
+
+  const projectIds = projects.map((p) => p.id);
+  const { data: taskData, error: taskErr } = await supabase
+    .from("tasks")
+    .select(TASK_COLS)
+    .in("project_id", projectIds)
+    .order("created_at", { ascending: true });
+  if (taskErr) throw new Error(taskErr.message);
+  const tasks = (taskData as TaskRow[]).map(mapTask);
+
+  const taskIds = tasks.map((t) => t.id);
+  let dependencies: TaskDependency[] = [];
+  if (taskIds.length > 0) {
+    const { data: depData, error: depErr } = await supabase
+      .from("task_dependencies")
+      .select("id, task_id, depends_on_task_id")
+      .in("task_id", taskIds);
+    if (depErr) throw new Error(depErr.message);
+    dependencies = (depData as TaskDependencyRow[]).map(mapTaskDependency);
+  }
+
+  return { projects, tasks, dependencies };
 }
 
 /** All projects (lightweight), sorted by release date. */

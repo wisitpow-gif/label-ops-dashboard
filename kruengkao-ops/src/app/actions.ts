@@ -7,20 +7,28 @@ import {
   mapProject,
   mapProjectAsset,
   mapTask,
+  mapTaskDependency,
   mapTaskTemplate,
   type ProjectAssetRow,
   type ProjectRow,
+  type TaskDependencyRow,
   type TaskRow,
   type TaskTemplateRow,
 } from "@/lib/mappers";
-import type { Project, ProjectAsset, Task, TaskTemplate } from "@/lib/types";
+import type {
+  Project,
+  ProjectAsset,
+  Task,
+  TaskDependency,
+  TaskTemplate,
+} from "@/lib/types";
 
 const ASSET_COLS =
   "id, project_id, provider_role, asset_name, status, submitted_link, vault_link, submitter_note, reviewer_note, version, created_at, updated_at";
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const TASK_COLS =
-  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, blocked_by";
+  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, blocked_by";
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 
@@ -144,28 +152,61 @@ export interface UpdateTaskInput {
   status?: string;
   role?: string;
   person?: string; // maps to assigned_to ("" => null/unassigned)
+  taskName?: string;
+  dueDate?: string | null; // "" / null => clear
 }
 
-/** Persist a single sub-task's status / assignment changes. */
+/** Persist a single task's status / assignment / detail changes.
+ *  Hard gate: refuses to set status = "Done" until every prerequisite in
+ *  task_dependencies is itself Done. */
 export async function updateTask(
   id: string,
   patch: UpdateTaskInput
 ): Promise<void> {
+  const supabase = await createClient();
+
+  if (patch.status === "Done") {
+    const { data: deps, error: depErr } = await supabase
+      .from("task_dependencies")
+      .select("depends_on_task_id")
+      .eq("task_id", id);
+    if (depErr) throw new Error(depErr.message);
+
+    const prereqIds = (deps ?? []).map(
+      (d) => (d as { depends_on_task_id: string }).depends_on_task_id
+    );
+    if (prereqIds.length > 0) {
+      const { data: prereqs, error: pErr } = await supabase
+        .from("tasks")
+        .select("task_name, status")
+        .in("id", prereqIds);
+      if (pErr) throw new Error(pErr.message);
+      const unmet = (prereqs ?? []).filter(
+        (t) => (t as { status: string }).status !== "Done"
+      );
+      if (unmet.length > 0) {
+        const names = unmet
+          .map((t) => (t as { task_name: string }).task_name)
+          .join(", ");
+        throw new Error(`ต้องทำให้เสร็จก่อน: ${names}`);
+      }
+    }
+  }
+
   const payload: Record<string, string | null> = {};
   if (patch.status !== undefined) payload.status = patch.status;
   if (patch.role !== undefined) payload.role = patch.role;
   if (patch.person !== undefined) payload.assigned_to = patch.person || null;
+  if (patch.taskName !== undefined) payload.task_name = patch.taskName;
+  if (patch.dueDate !== undefined) payload.due_date = patch.dueDate || null;
 
   if (Object.keys(payload).length === 0) return;
 
-  const supabase = await createClient();
   const { error } = await supabase.from("tasks").update(payload).eq("id", id);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   revalidatePath("/");
+  revalidatePath("/internal");
 }
 
 /** Delete a project; tasks/expenses/splits cascade via the FK constraints. */
@@ -534,4 +575,161 @@ export async function deleteProjectAsset(id: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("project_assets").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------------------
+// Internal / Ad-Hoc work (/internal)
+// ---------------------------------------------------------------------------
+
+export interface InternalProjectInput {
+  name: string;
+  targetDate?: string | null;
+}
+
+/** Create an Internal project (no artist/label/release — optional target). */
+export async function createInternalProject(
+  input: InternalProjectInput
+): Promise<Project> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      song_title: input.name,
+      work_type: "Internal",
+      target_date: input.targetDate || null,
+    })
+    .select(PROJECT_COLS)
+    .single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create internal project");
+  }
+  revalidatePath("/internal");
+  return mapProject(data as ProjectRow);
+}
+
+export async function updateInternalProject(
+  id: string,
+  input: InternalProjectInput
+): Promise<Project> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .update({ song_title: input.name, target_date: input.targetDate || null })
+    .eq("id", id)
+    .select(PROJECT_COLS)
+    .single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to update internal project");
+  }
+  revalidatePath("/internal");
+  return mapProject(data as ProjectRow);
+}
+
+/** Reuse the cascading project delete for internal projects too. */
+export async function deleteInternalProject(id: string): Promise<void> {
+  return deleteProject(id);
+}
+
+export interface CreateTaskInput {
+  projectId: string;
+  taskName: string;
+  role: string;
+  person: string;
+  dueDate?: string | null;
+}
+
+/** Add a manual task to an Internal project (category "General"). */
+export async function createTask(input: CreateTaskInput): Promise<Task> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      project_id: input.projectId,
+      task_key: null,
+      category: "General",
+      task_name: input.taskName,
+      role: input.role,
+      assigned_to: input.person || null,
+      status: "Not Start",
+      t_minus_days: 0,
+      duration_days: 0,
+      due_date: input.dueDate || null,
+    })
+    .select(TASK_COLS)
+    .single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to add task");
+  }
+  revalidatePath("/internal");
+  return mapTask(data as TaskRow);
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tasks").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/internal");
+}
+
+/**
+ * Add a hard-gate dependency (taskId depends on dependsOnTaskId), rejecting
+ * anything that would create a cycle. Returns the created edge.
+ */
+export async function addTaskDependency(
+  taskId: string,
+  dependsOnTaskId: string
+): Promise<TaskDependency> {
+  if (taskId === dependsOnTaskId) {
+    throw new Error("งานไม่สามารถขึ้นกับตัวเองได้");
+  }
+  const supabase = await createClient();
+
+  // Cycle check: would dependsOnTaskId (transitively) already depend on taskId?
+  const { data: allDeps, error: depErr } = await supabase
+    .from("task_dependencies")
+    .select("task_id, depends_on_task_id");
+  if (depErr) throw new Error(depErr.message);
+
+  const prereqsOf = new Map<string, string[]>();
+  for (const d of allDeps ?? []) {
+    const row = d as { task_id: string; depends_on_task_id: string };
+    if (!prereqsOf.has(row.task_id)) prereqsOf.set(row.task_id, []);
+    prereqsOf.get(row.task_id)!.push(row.depends_on_task_id);
+  }
+  // Walk prerequisites starting from dependsOnTaskId; reaching taskId => cycle.
+  const stack = [dependsOnTaskId];
+  const seen = new Set<string>();
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (node === taskId) {
+      throw new Error("สร้าง dependency นี้ไม่ได้ — จะเกิดวงจร (cycle)");
+    }
+    if (seen.has(node)) continue;
+    seen.add(node);
+    for (const p of prereqsOf.get(node) ?? []) stack.push(p);
+  }
+
+  const { data, error } = await supabase
+    .from("task_dependencies")
+    .upsert(
+      { task_id: taskId, depends_on_task_id: dependsOnTaskId },
+      { onConflict: "task_id,depends_on_task_id", ignoreDuplicates: false }
+    )
+    .select("id, task_id, depends_on_task_id")
+    .single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to add dependency");
+  }
+  revalidatePath("/internal");
+  return mapTaskDependency(data as TaskDependencyRow);
+}
+
+export async function removeTaskDependency(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("task_dependencies")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/internal");
 }

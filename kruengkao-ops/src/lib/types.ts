@@ -7,6 +7,15 @@ export type TaskGroup = "Digital Distribution Pack" | "TEASER & MV";
 
 export type ProjectType = "Single" | "Album" | "Live Session" | "Other";
 
+export type WorkType = "Release" | "Internal";
+
+/** A prerequisite edge: `taskId` is gated by `dependsOnTaskId` (hard gate). */
+export interface TaskDependency {
+  id: string;
+  taskId: string;
+  dependsOnTaskId: string;
+}
+
 // --- DAM: Digital Asset Management ---
 
 export type AssetStatus = "Pending Review" | "Revision" | "Vaulted";
@@ -54,6 +63,8 @@ export interface Task {
   role: string;
   /** Specific staff member within the role; "" = nobody chosen yet (tier 2) */
   person: string;
+  /** Optional direct due date (used by Internal tasks; releases derive from T-minus) */
+  dueDate?: string;
   /** Upstream dependency — when that task is late, this one shows as Blocked */
   blockedBy?: string;
 }
@@ -95,10 +106,14 @@ export interface Project {
   id: string;
   songName: string;
   artistName: string;
-  /** Label / sub-label the release belongs to */
+  /** Label / sub-label the release belongs to ("" for Internal work) */
   label: string;
   /** Workflow type — drives which task template generates its tasks */
   projectType: ProjectType;
-  /** ISO date string yyyy-mm-dd */
+  /** Release vs Internal/Ad-Hoc work */
+  workType: WorkType;
+  /** ISO date string yyyy-mm-dd ("" for Internal work) */
   releaseDate: string;
+  /** Optional overall deadline for Internal work */
+  targetDate?: string;
 }

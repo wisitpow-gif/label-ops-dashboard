@@ -4,19 +4,23 @@ import type {
   ProjectAsset,
   ProjectType,
   Task,
+  TaskDependency,
   TaskGroup,
   TaskStatus,
   TaskTemplate,
+  WorkType,
 } from "./types";
 
 // Shapes of the rows returned by Supabase (snake_case columns).
 export interface ProjectRow {
   id: string;
   song_title: string;
-  artist: string;
-  label: string;
+  artist: string | null;
+  label: string | null;
   project_type: string;
-  release_date: string; // yyyy-mm-dd
+  work_type: string;
+  release_date: string | null; // yyyy-mm-dd
+  target_date: string | null;
 }
 
 export interface TaskRow {
@@ -29,6 +33,7 @@ export interface TaskRow {
   status: string;
   t_minus_days: number;
   duration_days: number;
+  due_date: string | null;
   blocked_by: string | null;
 }
 
@@ -36,10 +41,12 @@ export function mapProject(row: ProjectRow): Project {
   return {
     id: row.id,
     songName: row.song_title,
-    artistName: row.artist,
-    label: row.label,
+    artistName: row.artist ?? "",
+    label: row.label ?? "",
     projectType: (row.project_type as ProjectType) ?? "Single",
-    releaseDate: row.release_date,
+    workType: (row.work_type as WorkType) ?? "Release",
+    releaseDate: row.release_date ?? "",
+    targetDate: row.target_date ?? undefined,
   };
 }
 
@@ -112,6 +119,21 @@ export function mapTask(row: TaskRow): Task {
     status: row.status as TaskStatus,
     role: row.role,
     person: row.assigned_to ?? "",
+    dueDate: row.due_date ?? undefined,
     blockedBy: row.blocked_by ?? undefined,
+  };
+}
+
+export interface TaskDependencyRow {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+}
+
+export function mapTaskDependency(row: TaskDependencyRow): TaskDependency {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    dependsOnTaskId: row.depends_on_task_id,
   };
 }
