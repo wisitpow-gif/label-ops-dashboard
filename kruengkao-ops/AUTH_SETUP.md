@@ -95,10 +95,43 @@ allowed members won't be able to onboard.
 
 ## Production checklist
 
-- [ ] Add the deployed origin to **Site URL** and **Redirect URLs** in Supabase.
-- [ ] Add the deployed origin's `/auth/v1/callback`… (already Supabase-side) and
-      ensure the Google client lists the Supabase callback (unchanged across
-      environments).
-- [ ] Set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
-      host's env (these are safe to expose; RLS is what protects data).
+- [ ] Deploy the app and note its production URL (see **Deploying to Vercel**).
+- [ ] Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
+      host's environment (same values as `.env.local`; both are safe to expose —
+      RLS is what protects the data).
+- [ ] Supabase → **Authentication → URL Configuration**: set **Site URL** to the
+      production URL and add `https://<prod-domain>/**` to **Redirect URLs**
+      (keep `http://localhost:3000/**` for local dev). This is the #1 cause of a
+      broken production login — an origin not on this list is refused.
+- [ ] Google Cloud — **no change needed.** The OAuth client's authorized redirect
+      URI is Supabase's callback
+      (`https://awkmwqaxuocoxvmnvovp.supabase.co/auth/v1/callback`), which is the
+      same across every environment. Only Supabase's Redirect URLs change per app
+      origin, not Google's.
 - [ ] Confirm `allowed_domains` / `allowed_emails` cover the whole team.
+- [ ] Smoke-test on production: sign in with a `@kruengkao.com` account (lands on
+      dashboard) and an outside account (bounced with the unauthorized message).
+
+## Deploying to Vercel
+
+The Next.js app lives in the **`kruengkao-ops/` subfolder** of the repo
+(`wisitpow-gif/label-ops-dashboard`), so the Root Directory must be set
+accordingly.
+
+1. **Import** the GitHub repo at [vercel.com/new](https://vercel.com/new).
+2. **Root Directory** → set to `kruengkao-ops` (click *Edit* next to Root
+   Directory during import). Framework preset auto-detects as **Next.js**; leave
+   Build Command / Output Directory on their defaults.
+3. **Environment Variables** → add the two `NEXT_PUBLIC_SUPABASE_*` values
+   (Production, Preview, and Development scopes).
+4. **Deploy.** Vercel gives you a `https://<project>.vercel.app` URL.
+5. Back in **Supabase → Authentication → URL Configuration**, set **Site URL** to
+   that URL and add `https://<project>.vercel.app/**` to **Redirect URLs**.
+6. **Smoke-test** the production login (both the success and rejection paths).
+7. *(Optional)* Add a custom domain in Vercel (e.g. `ops.kruengkao.com`), then
+   add that origin to Supabase's Site URL + Redirect URLs too.
+
+> **Preview deploys:** each PR gets its own `*.vercel.app` URL. Those origins are
+> also refused by Supabase auth unless added to Redirect URLs. Either add the
+> Vercel preview wildcard `https://*-<team>.vercel.app/**`, or simply test auth on
+> the production/localhost origins.
