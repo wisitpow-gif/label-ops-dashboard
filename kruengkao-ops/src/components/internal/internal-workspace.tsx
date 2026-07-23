@@ -58,6 +58,7 @@ import {
 } from "@/app/actions";
 import type { Project, Task, TaskDependency, TaskStatus } from "@/lib/types";
 import { AssigneeSelect, StatusSelect } from "@/components/dashboard/task-controls";
+import { UserMenu } from "@/components/auth/user-menu";
 
 // ---------------------------------------------------------------------------
 // Project create/edit dialog (name + optional target date)
@@ -376,10 +377,12 @@ export function InternalWorkspace({
   initialProjects,
   initialTasks,
   initialDependencies,
+  userEmail,
 }: {
   initialProjects: Project[];
   initialTasks: Task[];
   initialDependencies: TaskDependency[];
+  userEmail?: string | null;
 }) {
   const [projects, setProjects] = React.useState(initialProjects);
   const [tasks, setTasks] = React.useState(initialTasks);
@@ -527,10 +530,13 @@ export function InternalWorkspace({
               </p>
             </div>
           </div>
-          <Button onClick={() => setProjectDialog({})}>
-            <Plus data-icon="inline-start" />
-            New Project
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setProjectDialog({})}>
+              <Plus data-icon="inline-start" />
+              New Project
+            </Button>
+            <UserMenu email={userEmail ?? null} />
+          </div>
         </div>
       </header>
 

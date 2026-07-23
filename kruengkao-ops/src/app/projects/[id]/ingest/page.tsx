@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 
 import { IngestHub } from "@/components/ingest/ingest-hub";
-import { getProjectAssets, getProjectById } from "@/lib/queries";
+import {
+  getCurrentUserEmail,
+  getProjectAssets,
+  getProjectById,
+} from "@/lib/queries";
 
 export default async function IngestPage({
   params,
@@ -9,12 +13,15 @@ export default async function IngestPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [project, assets] = await Promise.all([
+  const [project, assets, userEmail] = await Promise.all([
     getProjectById(id),
     getProjectAssets(id),
+    getCurrentUserEmail(),
   ]);
 
   if (!project) notFound();
 
-  return <IngestHub project={project} initialAssets={assets} />;
+  return (
+    <IngestHub project={project} initialAssets={assets} userEmail={userEmail} />
+  );
 }

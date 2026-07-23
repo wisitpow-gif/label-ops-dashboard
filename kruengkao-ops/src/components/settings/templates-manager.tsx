@@ -51,6 +51,7 @@ import {
   updateTaskTemplate,
 } from "@/app/actions";
 import type { ProjectType, TaskTemplate } from "@/lib/types";
+import { UserMenu } from "@/components/auth/user-menu";
 import {
   TemplateFormDialog,
   type TemplateFormValues,
@@ -58,8 +59,10 @@ import {
 
 export function TemplatesManager({
   initialTemplates,
+  userEmail,
 }: {
   initialTemplates: TaskTemplate[];
+  userEmail?: string | null;
 }) {
   const [templates, setTemplates] =
     React.useState<TaskTemplate[]>(initialTemplates);
@@ -152,18 +155,21 @@ export function TemplatesManager({
           <ArrowLeft className="size-4" />
           กลับสู่ Dashboard
         </Link>
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-foreground text-background">
-            <Disc3 className="size-5" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-foreground text-background">
+              <Disc3 className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">
+                Workflow Templates
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                จัดการงานตั้งต้นของแต่ละ Project Type — ใช้ตอนสร้างโปรเจกต์ใหม่
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">
-              Workflow Templates
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              จัดการงานตั้งต้นของแต่ละ Project Type — ใช้ตอนสร้างโปรเจกต์ใหม่
-            </p>
-          </div>
+          <UserMenu email={userEmail ?? null} />
         </div>
       </header>
 

@@ -1,7 +1,12 @@
 import { TemplatesManager } from "@/components/settings/templates-manager";
-import { getTaskTemplates } from "@/lib/queries";
+import { getCurrentUserEmail, getTaskTemplates } from "@/lib/queries";
 
 export default async function TemplatesSettingsPage() {
-  const templates = await getTaskTemplates();
-  return <TemplatesManager initialTemplates={templates} />;
+  const [templates, userEmail] = await Promise.all([
+    getTaskTemplates(),
+    getCurrentUserEmail(),
+  ]);
+  return (
+    <TemplatesManager initialTemplates={templates} userEmail={userEmail} />
+  );
 }

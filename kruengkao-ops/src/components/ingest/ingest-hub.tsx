@@ -56,6 +56,7 @@ import {
   reviewProjectAsset,
 } from "@/app/actions";
 import type { AssetStatus, Project, ProjectAsset } from "@/lib/types";
+import { UserMenu } from "@/components/auth/user-menu";
 
 const PROVIDER_ROLES = ["Producer", "Promoter", "Graphics"];
 
@@ -376,9 +377,11 @@ function ReviewAssetDialog({
 export function IngestHub({
   project,
   initialAssets,
+  userEmail,
 }: {
   project: Project;
   initialAssets: ProjectAsset[];
+  userEmail?: string | null;
 }) {
   const [assets, setAssets] = React.useState<ProjectAsset[]>(initialAssets);
   const [submit, setSubmit] = React.useState<{
@@ -476,10 +479,13 @@ export function IngestHub({
               </p>
             </div>
           </div>
-          <Button onClick={() => setSubmit({ mode: "create" })}>
-            <Plus data-icon="inline-start" />
-            Submit Asset
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setSubmit({ mode: "create" })}>
+              <Plus data-icon="inline-start" />
+              Submit Asset
+            </Button>
+            <UserMenu email={userEmail ?? null} />
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">

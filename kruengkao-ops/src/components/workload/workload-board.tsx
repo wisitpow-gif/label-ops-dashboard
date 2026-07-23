@@ -33,6 +33,7 @@ import {
 import type { Project, Task, TaskDependency } from "@/lib/types";
 import { updateTask } from "@/app/actions";
 import { StatusSelect, AssigneeSelect } from "@/components/dashboard/task-controls";
+import { UserMenu } from "@/components/auth/user-menu";
 
 // ---------------------------------------------------------------------------
 // People columns: every distinct staff member across all roles, in team order,
@@ -201,10 +202,12 @@ export function WorkloadBoard({
   initialProjects,
   initialTasks,
   initialDependencies,
+  userEmail,
 }: {
   initialProjects: Project[];
   initialTasks: Task[];
   initialDependencies: TaskDependency[];
+  userEmail?: string | null;
 }) {
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
   // Projects & dependencies are read-only on this view.
@@ -380,6 +383,7 @@ export function WorkloadBoard({
               />
               ซ่อนคนที่ไม่มีงาน
             </label>
+            <UserMenu email={userEmail ?? null} />
           </div>
         </header>
 

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Project, ProjectAsset } from "@/lib/types";
+import { UserMenu } from "@/components/auth/user-menu";
 
 async function copyLink(url: string) {
   try {
@@ -42,9 +43,11 @@ async function copyLink(url: string) {
 export function LibraryMap({
   projects,
   vaultedAssets,
+  userEmail,
 }: {
   projects: Project[];
   vaultedAssets: ProjectAsset[];
+  userEmail?: string | null;
 }) {
   const [query, setQuery] = React.useState("");
 
@@ -86,18 +89,21 @@ export function LibraryMap({
           <ArrowLeft className="size-4" />
           กลับสู่ Dashboard
         </Link>
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-foreground text-background">
-            <Library className="size-5" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-foreground text-background">
+              <Library className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">
+                Library Map
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                คลังไฟล์สุดท้าย (Vaulted) ของทุกโปรเจกต์ — สำหรับทีม Digital / Admin
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">
-              Library Map
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              คลังไฟล์สุดท้าย (Vaulted) ของทุกโปรเจกต์ — สำหรับทีม Digital / Admin
-            </p>
-          </div>
+          <UserMenu email={userEmail ?? null} />
         </div>
 
         <div className="relative">

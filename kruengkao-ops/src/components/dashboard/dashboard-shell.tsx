@@ -40,6 +40,7 @@ import {
   updateProject,
   updateTask,
 } from "@/app/actions";
+import { UserMenu } from "@/components/auth/user-menu";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
 import {
@@ -52,9 +53,11 @@ import { ProjectTable } from "./project-table";
 export function DashboardShell({
   initialProjects,
   initialTasks,
+  userEmail,
 }: {
   initialProjects: Project[];
   initialTasks: Task[];
+  userEmail?: string | null;
 }) {
   const [projects, setProjects] = React.useState<Project[]>(initialProjects);
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
@@ -267,6 +270,7 @@ export function DashboardShell({
               </TooltipTrigger>
               <TooltipContent>Workflow Templates</TooltipContent>
             </Tooltip>
+            <UserMenu email={userEmail ?? null} />
           </div>
         </header>
 

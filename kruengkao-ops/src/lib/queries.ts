@@ -21,6 +21,15 @@ import type {
   TaskTemplate,
 } from "@/lib/types";
 
+/** Email of the currently authenticated user (null if somehow unauthenticated). */
+export async function getCurrentUserEmail(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.email ?? null;
+}
+
 const PROJECT_COLS =
   "id, song_title, artist, label, project_type, work_type, release_date, target_date";
 const TASK_COLS =
