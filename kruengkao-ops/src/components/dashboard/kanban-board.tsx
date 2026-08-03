@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { formatShort, startOfToday, toISODate } from "@/lib/dates";
 import { UNASSIGNED, initialsOf, taskDeadline } from "@/lib/mock-data";
@@ -20,10 +21,11 @@ import { useTeam } from "@/components/team/team-provider";
 import type { Project, Task } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
 
-// Columns represent ROLES (departments). Unassigned bucket comes first.
+// Columns represent ROLES (departments); the Unassigned bucket sits last so
+// the actionable, owned work reads first.
 const COLUMNS: { role: string; label: string }[] = [
-  { role: UNASSIGNED, label: "Unassigned" },
   ...TEAM_ROLES.map((role) => ({ role, label: role })),
+  { role: UNASSIGNED, label: "Unassigned" },
 ];
 
 // Department accent colors for the column header dot
@@ -222,6 +224,7 @@ export function KanbanBoard({
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const [overColumn, setOverColumn] = React.useState<string | null>(null);
   const [projectFilter, setProjectFilter] = React.useState<string>(ALL_PROJECTS);
+  const [hideDone, setHideDone] = React.useState(false);
 
   const projectById = React.useMemo(() => {
     const map = new Map<string, Project>();
@@ -248,8 +251,9 @@ export function KanbanBoard({
       .filter(
         (t) => effectiveProject === ALL_PROJECTS || t.projectId === effectiveProject
       )
+      .filter((t) => !(hideDone && t.status === "Done"))
       .sort((a, b) => deadlineKey(a).localeCompare(deadlineKey(b)));
-  }, [tasks, projectById, effectiveProject]);
+  }, [tasks, projectById, effectiveProject, hideDone]);
 
   function tasksForColumn(role: string) {
     return sortedVisibleTasks.filter((t) => (t.role || UNASSIGNED) === role);
@@ -266,8 +270,8 @@ export function KanbanBoard({
 
   return (
     <div className="space-y-3">
-      {/* Secondary filter — by project */}
-      <div className="flex items-center gap-2">
+      {/* Filters — by project + hide-done toggle */}
+      <div className="flex flex-wrap items-center gap-3">
         <Select value={effectiveProject} onValueChange={setProjectFilter}>
           <SelectTrigger className="w-[260px]" aria-label="กรองตามโปรเจกต์">
             <Music2 className="size-4 text-muted-foreground" />
@@ -284,6 +288,13 @@ export function KanbanBoard({
             ))}
           </SelectContent>
         </Select>
+
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm">
+          <Switch checked={hideDone} onCheckedChange={setHideDone} />
+          <span className={cn(!hideDone && "text-muted-foreground")}>
+            Hide Done Tasks
+          </span>
+        </label>
       </div>
 
       <div className="overflow-x-auto rounded-xl border p-3">

@@ -212,6 +212,28 @@ function SubTaskPanel({
   );
 }
 
+type ProjectPhase = "Ongoing" | "Todo" | "Done";
+
+/** Roll a project's task statuses up to one of three lifecycle phases. */
+function projectPhase(projectTasks: Task[]): ProjectPhase {
+  if (projectTasks.length === 0) return "Todo";
+  if (projectTasks.every((t) => t.status === "Done")) return "Done";
+  if (projectTasks.every((t) => t.status === "Not Start")) return "Todo";
+  return "Ongoing";
+}
+
+// Section order + styling. Ongoing (actionable) first, Done last.
+const PHASES: {
+  key: ProjectPhase;
+  label: string;
+  dot: string;
+  hint: string;
+}[] = [
+  { key: "Ongoing", label: "Ongoing", dot: "bg-blue-500", hint: "กำลังดำเนินการ" },
+  { key: "Todo", label: "Todo", dot: "bg-muted-foreground/40", hint: "ยังไม่เริ่ม" },
+  { key: "Done", label: "Done", dot: "bg-emerald-500", hint: "เสร็จแล้ว" },
+];
+
 export function ProjectTable({
   projects,
   tasks,
@@ -240,6 +262,32 @@ export function ProjectTable({
       return next;
     });
 
+  // Done starts collapsed so the view opens focused on actionable work.
+  const [collapsedSections, setCollapsedSections] = React.useState<
+    Set<ProjectPhase>
+  >(() => new Set<ProjectPhase>(["Done"]));
+  const toggleSection = (key: ProjectPhase) =>
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  // Bucket the (already release-date-sorted) projects by lifecycle phase.
+  const sections = React.useMemo(() => {
+    const buckets: Record<ProjectPhase, Project[]> = {
+      Ongoing: [],
+      Todo: [],
+      Done: [],
+    };
+    for (const p of projects) {
+      const phase = projectPhase(tasks.filter((t) => t.projectId === p.id));
+      buckets[phase].push(p);
+    }
+    return PHASES.map((ph) => ({ ...ph, projects: buckets[ph.key] }));
+  }, [projects, tasks]);
+
   return (
     <div className="overflow-hidden rounded-xl border">
       <Table>
@@ -267,13 +315,48 @@ export function ProjectTable({
               </TableCell>
             </TableRow>
           )}
-          {projects.map((project) => {
-            const projectTasks = tasks.filter(
-              (t) => t.projectId === project.id
-            );
-            const isOpen = expanded.has(project.id);
+          {sections.map((section) => {
+            if (section.projects.length === 0) return null;
+            const collapsed = collapsedSections.has(section.key);
             return (
-              <React.Fragment key={project.id}>
+              <React.Fragment key={`section-${section.key}`}>
+                <TableRow
+                  className="border-t-2 bg-muted/40 hover:bg-muted/40"
+                  onClick={() => toggleSection(section.key)}
+                >
+                  <TableCell
+                    colSpan={TASK_GROUPS.length + 4}
+                    className="cursor-pointer py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      {collapsed ? (
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="size-4 text-muted-foreground" />
+                      )}
+                      <span
+                        className={cn("size-2.5 rounded-full", section.dot)}
+                      />
+                      <span className="text-sm font-semibold">
+                        {section.label}
+                      </span>
+                      <span className="rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground">
+                        {section.projects.length}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {section.hint}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {!collapsed &&
+                  section.projects.map((project) => {
+                    const projectTasks = tasks.filter(
+                      (t) => t.projectId === project.id
+                    );
+                    const isOpen = expanded.has(project.id);
+                    return (
+                      <React.Fragment key={project.id}>
                 <TableRow
                   className="cursor-pointer"
                   onClick={() => toggle(project.id)}
@@ -407,6 +490,9 @@ export function ProjectTable({
                     </TableCell>
                   </TableRow>
                 )}
+                      </React.Fragment>
+                    );
+                  })}
               </React.Fragment>
             );
           })}
