@@ -28,6 +28,51 @@ const COLUMNS: { role: string; label: string }[] = [
   { role: UNASSIGNED, label: "Unassigned" },
 ];
 
+interface PersonBucket {
+  person: string; // "" = tasks in this role with no specific owner yet
+  tasks: Task[];
+  done: number;
+  overdue: number;
+}
+
+/**
+ * Within a role column, sub-group tasks by the specific assigned person so you
+ * can see each member's load and how much they've cleared. Busiest (most
+ * queuing) first; the unassigned bucket sinks to the bottom. Input order is
+ * preserved within each bucket (columns arrive deadline-sorted).
+ */
+function bucketByPerson(
+  tasks: Task[],
+  projectById: Map<string, Project>,
+  today: Date
+): PersonBucket[] {
+  const map = new Map<string, PersonBucket>();
+  for (const t of tasks) {
+    const key = t.person || "";
+    let b = map.get(key);
+    if (!b) {
+      b = { person: key, tasks: [], done: 0, overdue: 0 };
+      map.set(key, b);
+    }
+    b.tasks.push(t);
+    if (t.status === "Done") b.done += 1;
+    else {
+      const p = projectById.get(t.projectId);
+      if (p && taskDeadline(t, p) < today) b.overdue += 1;
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    if ((a.person === "") !== (b.person === "")) return a.person === "" ? 1 : -1;
+    const ra = a.tasks.length - a.done;
+    const rb = b.tasks.length - b.done;
+    return (
+      rb - ra ||
+      b.tasks.length - a.tasks.length ||
+      a.person.localeCompare(b.person)
+    );
+  });
+}
+
 // Department accent colors for the column header dot
 const ROLE_DOT: Record<string, string> = {
   Unassigned: "bg-muted-foreground/40",
@@ -255,6 +300,8 @@ export function KanbanBoard({
       .sort((a, b) => deadlineKey(a).localeCompare(deadlineKey(b)));
   }, [tasks, projectById, effectiveProject, hideDone]);
 
+  const today = startOfToday();
+
   function tasksForColumn(role: string) {
     return sortedVisibleTasks.filter((t) => (t.role || UNASSIGNED) === role);
   }
@@ -334,27 +381,76 @@ export function KanbanBoard({
                   </span>
                 </div>
 
-                <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
-                  {colTasks.map((task) => {
-                    const project = projectById.get(task.projectId);
-                    if (!project) return null;
+                <div className="flex min-h-24 flex-1 flex-col gap-3 p-2">
+                  {bucketByPerson(colTasks, projectById, today).map((bucket) => {
+                    const total = bucket.tasks.length;
+                    const queuing = total - bucket.done;
+                    const cleared = queuing === 0;
+                    const isUnassigned = bucket.person === "";
                     return (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        project={project}
-                        isDragging={draggingId === task.id}
-                        onDragStart={(e, cardEl) => {
-                          e.dataTransfer.setData("text/plain", task.id);
-                          e.dataTransfer.effectAllowed = "move";
-                          if (cardEl) e.dataTransfer.setDragImage(cardEl, 20, 20);
-                          setDraggingId(task.id);
-                        }}
-                        onDragEnd={() => setDraggingId(null)}
-                        onPersonChange={(person) =>
-                          onTaskUpdate(task.id, { person })
-                        }
-                      />
+                      <div key={bucket.person || "__unassigned__"} className="space-y-1.5">
+                        {/* Per-person sub-header: who + cleared/total load */}
+                        <div className="flex items-center gap-1.5 px-0.5">
+                          {isUnassigned ? (
+                            <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-dashed text-[8px] text-muted-foreground">
+                              ?
+                            </span>
+                          ) : (
+                            <Avatar className="size-4 shrink-0">
+                              <AvatarFallback className="text-[8px]">
+                                {initialsOf(bucket.person)}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                          <span className="truncate text-xs font-medium">
+                            {isUnassigned ? "Unassigned" : bucket.person}
+                          </span>
+                          <span
+                            title={`${bucket.done} เสร็จ · ${queuing} ค้าง${
+                              bucket.overdue > 0
+                                ? ` · ${bucket.overdue} เกินกำหนด`
+                                : ""
+                            }`}
+                            className={cn(
+                              "ml-auto shrink-0 rounded-full border px-1.5 text-[10px] font-medium tabular-nums",
+                              bucket.overdue > 0
+                                ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
+                                : cleared
+                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                  : "bg-background text-muted-foreground"
+                            )}
+                          >
+                            {bucket.done}/{total}
+                          </span>
+                        </div>
+
+                        {/* That person's task cards */}
+                        <div className="flex flex-col gap-2">
+                          {bucket.tasks.map((task) => {
+                            const project = projectById.get(task.projectId);
+                            if (!project) return null;
+                            return (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                project={project}
+                                isDragging={draggingId === task.id}
+                                onDragStart={(e, cardEl) => {
+                                  e.dataTransfer.setData("text/plain", task.id);
+                                  e.dataTransfer.effectAllowed = "move";
+                                  if (cardEl)
+                                    e.dataTransfer.setDragImage(cardEl, 20, 20);
+                                  setDraggingId(task.id);
+                                }}
+                                onDragEnd={() => setDraggingId(null)}
+                                onPersonChange={(person) =>
+                                  onTaskUpdate(task.id, { person })
+                                }
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                   {colTasks.length === 0 && (
