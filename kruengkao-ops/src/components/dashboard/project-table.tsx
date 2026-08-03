@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,7 +45,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatFull, formatShort, parseDate, startOfToday } from "@/lib/dates";
-import { TASK_GROUPS, packStatus, taskDeadline } from "@/lib/mock-data";
+import { TASK_GROUPS, initialsOf, packStatus, taskDeadline } from "@/lib/mock-data";
 import type { Project, Task, TaskGroup } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
 import { AssigneeSelect, StatusSelect } from "./task-controls";
@@ -70,6 +71,106 @@ function PackCell({ tasks }: { tasks: Task[] }) {
           {done}/{tasks.length}
         </span>
       </div>
+    </div>
+  );
+}
+
+interface PersonLoad {
+  person: string;
+  total: number;
+  done: number;
+  overdue: number;
+}
+
+/**
+ * Per-assignee workload chips for a project row: each person's cleared/total,
+ * sorted with the most-queuing first. Shows how work is distributed and who is
+ * backed up — the full cleared/queuing/overdue breakdown is in the tooltip.
+ */
+function TeamWorkloadStrip({
+  tasks,
+  project,
+}: {
+  tasks: Task[];
+  project: Project;
+}) {
+  const today = startOfToday();
+  const { loads, unassigned } = React.useMemo(() => {
+    const map = new Map<string, PersonLoad>();
+    let unassigned = 0;
+    for (const t of tasks) {
+      if (!t.person) {
+        unassigned += 1;
+        continue;
+      }
+      const s =
+        map.get(t.person) ??
+        { person: t.person, total: 0, done: 0, overdue: 0 };
+      s.total += 1;
+      if (t.status === "Done") s.done += 1;
+      else if (taskDeadline(t, project) < today) s.overdue += 1;
+      map.set(t.person, s);
+    }
+    const loads = [...map.values()].sort(
+      (a, b) =>
+        b.total - b.done - (a.total - a.done) || // most queuing first
+        b.total - a.total ||
+        a.person.localeCompare(b.person)
+    );
+    return { loads, unassigned };
+  }, [tasks, project, today]);
+
+  if (loads.length === 0 && unassigned === 0) return null;
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      {loads.map((l) => {
+        const queuing = l.total - l.done;
+        const cleared = queuing === 0;
+        return (
+          <Tooltip key={l.person}>
+            <TooltipTrigger asChild>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium",
+                  l.overdue > 0
+                    ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
+                    : cleared
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      : "bg-background text-foreground/80"
+                )}
+              >
+                <Avatar className="size-4">
+                  <AvatarFallback className="text-[8px]">
+                    {initialsOf(l.person)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="tabular-nums">
+                  {l.done}/{l.total}
+                </span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="font-medium">{l.person}</span> — {l.done} เสร็จ ·{" "}
+              {queuing} ค้าง
+              {l.overdue > 0 ? ` · ${l.overdue} เกินกำหนด` : ""}
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+      {unassigned > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center gap-1 rounded-full border border-dashed px-1.5 py-0.5 text-[11px] text-muted-foreground">
+              <span className="flex size-4 items-center justify-center rounded-full border border-dashed text-[8px]">
+                ?
+              </span>
+              <span className="tabular-nums">{unassigned}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{unassigned} งานยังไม่ได้มอบหมาย</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 }
@@ -385,11 +486,15 @@ export function ProjectTable({
                           <ChevronRight className="size-4" />
                         )}
                       </Button>
-                      <div>
+                      <div className="min-w-0">
                         <div className="font-medium">{project.songName}</div>
                         <div className="text-xs text-muted-foreground">
                           {project.artistName} · {project.label}
                         </div>
+                        <TeamWorkloadStrip
+                          tasks={projectTasks}
+                          project={project}
+                        />
                       </div>
                     </div>
                   </TableCell>
