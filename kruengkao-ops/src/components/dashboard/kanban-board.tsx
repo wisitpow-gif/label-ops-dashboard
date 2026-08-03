@@ -152,6 +152,7 @@ function TaskCard({
   onDragStart,
   onDragEnd,
   onPersonChange,
+  compact = false,
 }: {
   task: Task;
   project: Project;
@@ -159,10 +160,27 @@ function TaskCard({
   onDragStart: (e: React.DragEvent, cardEl: HTMLElement | null) => void;
   onDragEnd: () => void;
   onPersonChange: (person: string) => void;
+  /** When grouped under a project header, drop the project block and lead with the task. */
+  compact?: boolean;
 }) {
   const cardRef = React.useRef<HTMLDivElement>(null);
   const deadline = taskDeadline(task, project);
   const overdue = deadline < startOfToday() && task.status !== "Done";
+
+  // Drag handle — only this initiates the drag, so the person Select inside
+  // the card stays clickable.
+  const dragHandle = (
+    <button
+      type="button"
+      draggable
+      onDragStart={(e) => onDragStart(e, cardRef.current)}
+      onDragEnd={onDragEnd}
+      aria-label="ลากเพื่อมอบหมายใหม่"
+      className="shrink-0 cursor-grab text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
+    >
+      <GripVertical className="size-4" />
+    </button>
+  );
 
   return (
     <div
@@ -173,42 +191,44 @@ function TaskCard({
         isDragging && "opacity-40"
       )}
     >
-      {/* Project context — the dominant block */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-bold leading-snug">
-            {project.songName}
+      {compact ? (
+        /* Task-focused: the project is shown in the group header above */
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 text-sm font-medium leading-snug">
+            {task.name}
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            <span className="truncate text-xs font-medium text-muted-foreground">
-              {project.artistName}
-            </span>
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
-                LABEL_CHIP[project.label] ?? "bg-muted text-muted-foreground"
-              )}
-            >
-              {project.label}
-            </span>
-          </div>
+          {dragHandle}
         </div>
-        {/* Drag handle — only this initiates the drag, so the person
-            Select inside the card stays clickable */}
-        <button
-          type="button"
-          draggable
-          onDragStart={(e) => onDragStart(e, cardRef.current)}
-          onDragEnd={onDragEnd}
-          aria-label="ลากเพื่อย้ายแผนก"
-          className="shrink-0 cursor-grab text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
-        >
-          <GripVertical className="size-4" />
-        </button>
-      </div>
-
-      {/* Task name */}
-      <div className="mt-2 border-t pt-2 text-sm leading-snug">{task.name}</div>
+      ) : (
+        <>
+          {/* Project context — the dominant block */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold leading-snug">
+                {project.songName}
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span className="truncate text-xs font-medium text-muted-foreground">
+                  {project.artistName}
+                </span>
+                <span
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
+                    LABEL_CHIP[project.label] ?? "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {project.label}
+                </span>
+              </div>
+            </div>
+            {dragHandle}
+          </div>
+          {/* Task name */}
+          <div className="mt-2 border-t pt-2 text-sm leading-snug">
+            {task.name}
+          </div>
+        </>
+      )}
 
       {/* Deadline + status */}
       <div className="mt-2 flex items-center justify-between gap-2">
@@ -309,7 +329,7 @@ export function KanbanBoard({
     setDraggingId(null);
   }
 
-  // A single card renderer reused by both the collapsed column and sub-columns.
+  // A single (compact) card renderer reused by every column and sub-column.
   const renderCard = (task: Task) => {
     const project = projectById.get(task.projectId);
     if (!project) return null;
@@ -318,6 +338,7 @@ export function KanbanBoard({
         key={task.id}
         task={task}
         project={project}
+        compact
         isDragging={draggingId === task.id}
         onDragStart={(e, cardEl) => {
           e.dataTransfer.setData("text/plain", task.id);
@@ -329,6 +350,33 @@ export function KanbanBoard({
         onPersonChange={(person) => onTaskUpdate(task.id, { person })}
       />
     );
+  };
+
+  // Group a column's tasks by project (preserving deadline order, so project
+  // groups appear by their earliest task), each under a sticky project header.
+  const renderGroupedTasks = (list: Task[]) => {
+    const order: string[] = [];
+    const byProject = new Map<string, Task[]>();
+    for (const t of list) {
+      if (!byProject.has(t.projectId)) {
+        byProject.set(t.projectId, []);
+        order.push(t.projectId);
+      }
+      byProject.get(t.projectId)!.push(t);
+    }
+    return order.map((pid) => {
+      const project = projectById.get(pid);
+      if (!project) return null;
+      return (
+        <div key={pid} className="space-y-2">
+          <div className="sticky top-0 z-10 flex items-center gap-1 rounded-md bg-neutral-700 px-2 py-1 text-[11px] font-semibold text-neutral-50 shadow-sm dark:bg-neutral-800">
+            <span className="opacity-60">Project:</span>
+            <span className="truncate">{project.songName}</span>
+          </div>
+          <div className="space-y-2">{byProject.get(pid)!.map(renderCard)}</div>
+        </div>
+      );
+    });
   };
 
   return (
@@ -360,176 +408,185 @@ export function KanbanBoard({
         </label>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border p-3">
-        <div className="flex items-start gap-3">
-          {COLUMNS.map((col) => {
-            const colTasks = tasksForColumn(col.role);
-            const canExpand = col.role !== UNASSIGNED;
-            const expanded = canExpand && expandedRoles.has(col.role);
+      {/* Fixed-height board: columns fill the height and scroll internally, so
+          the horizontal scrollbar stays pinned near the bottom of the screen. */}
+      <div className="flex h-[calc(100vh-220px)] gap-3 overflow-x-auto rounded-xl border p-3">
+        {COLUMNS.map((col) => {
+          const colTasks = tasksForColumn(col.role);
+          const canExpand = col.role !== UNASSIGNED;
+          const expanded = canExpand && expandedRoles.has(col.role);
 
-            const header = (
-              <div className="flex items-center gap-2 border-b px-3 py-2">
-                <span
-                  className={cn(
-                    "size-2.5 shrink-0 rounded-full",
-                    ROLE_DOT[col.role] ?? "bg-muted-foreground/40"
-                  )}
-                />
-                <span className="text-sm font-semibold">{col.label}</span>
-                <span className="ml-auto rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground">
-                  {colTasks.length}
-                </span>
-                {canExpand && (
-                  <button
-                    type="button"
-                    onClick={() => toggleRole(col.role)}
-                    aria-label={
-                      expanded
-                        ? `ยุบ ${col.label} เป็นคอลัมน์เดียว`
-                        : `ขยาย ${col.label} แยกตามผู้รับผิดชอบ`
-                    }
-                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                  >
-                    {expanded ? (
-                      <ChevronsRightLeft className="size-4" />
-                    ) : (
-                      <ChevronsLeftRight className="size-4" />
-                    )}
-                  </button>
+          const header = (
+            <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
+              <span
+                className={cn(
+                  "size-2.5 shrink-0 rounded-full",
+                  ROLE_DOT[col.role] ?? "bg-muted-foreground/40"
                 )}
-              </div>
-            );
-
-            // COLLAPSED — one unified column with all of the role's tasks.
-            if (!expanded) {
-              const isOver = overColumn === col.role;
-              return (
-                <div
-                  key={col.role}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    setOverColumn(col.role);
-                  }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                      setOverColumn((c) => (c === col.role ? null : c));
-                    }
-                  }}
-                  onDrop={(e) => handleDrop(e, col.role, "")}
-                  className={cn(
-                    "flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
-                    isOver && "bg-primary/10 ring-2 ring-primary/40"
-                  )}
+              />
+              <span className="text-sm font-semibold">{col.label}</span>
+              <span className="ml-auto rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground">
+                {colTasks.length}
+              </span>
+              {canExpand && (
+                <button
+                  type="button"
+                  onClick={() => toggleRole(col.role)}
+                  aria-label={
+                    expanded
+                      ? `ยุบ ${col.label} เป็นคอลัมน์เดียว`
+                      : `ขยาย ${col.label} แยกตามผู้รับผิดชอบ`
+                  }
+                  className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                 >
-                  {header}
-                  <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
-                    {colTasks.map(renderCard)}
-                    {colTasks.length === 0 && (
-                      <div className="flex flex-1 items-center justify-center rounded-md border border-dashed py-6 text-xs text-muted-foreground">
-                        ลากงานมาที่นี่
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            }
+                  {expanded ? (
+                    <ChevronsRightLeft className="size-4" />
+                  ) : (
+                    <ChevronsLeftRight className="size-4" />
+                  )}
+                </button>
+              )}
+            </div>
+          );
 
-            // EXPANDED — one sub-column per member (+ Unassigned), side by side.
-            const present = colTasks.map((t) => t.person).filter(Boolean);
-            const people = [...new Set([...membersOfRole(col.role), ...present])];
-            const subCols = [
-              ...people.map((p) => ({ person: p, label: p })),
-              { person: "", label: "Unassigned" },
-            ];
+          // COLLAPSED — one unified column with all of the role's tasks.
+          if (!expanded) {
+            const isOver = overColumn === col.role;
             return (
               <div
                 key={col.role}
-                className="flex shrink-0 flex-col rounded-lg bg-muted/40 ring-1 ring-primary/30"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setOverColumn(col.role);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setOverColumn((c) => (c === col.role ? null : c));
+                  }
+                }}
+                onDrop={(e) => handleDrop(e, col.role, "")}
+                className={cn(
+                  "flex h-full w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
+                  isOver && "bg-primary/10 ring-2 ring-primary/40"
+                )}
               >
                 {header}
-                <div className="flex items-start gap-2 p-2">
-                  {subCols.map((sc) => {
-                    const scTasks = colTasks.filter(
-                      (t) => (t.person || "") === sc.person
-                    );
-                    const { done, overdue, total } = countsFor(
-                      scTasks,
-                      projectById,
-                      today
-                    );
-                    const cleared = total > 0 && done === total;
-                    const isUnassigned = sc.person === "";
-                    const key = `${col.role}::${sc.person}`;
-                    const isOver = overColumn === key;
-                    return (
-                      <div
-                        key={sc.person || "__unassigned__"}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = "move";
-                          setOverColumn(key);
-                        }}
-                        onDragLeave={(e) => {
-                          if (
-                            !e.currentTarget.contains(e.relatedTarget as Node)
-                          ) {
-                            setOverColumn((c) => (c === key ? null : c));
-                          }
-                        }}
-                        onDrop={(e) => handleDrop(e, col.role, sc.person)}
-                        className={cn(
-                          "flex w-56 shrink-0 flex-col rounded-md border bg-background/50 transition-colors",
-                          isOver && "bg-primary/10 ring-2 ring-primary/40"
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5 border-b px-2 py-1.5">
-                          {isUnassigned ? (
-                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed text-[9px] text-muted-foreground">
-                              ?
-                            </span>
-                          ) : (
-                            <Avatar className="size-5 shrink-0">
-                              <AvatarFallback className="text-[9px]">
-                                {initialsOf(sc.person)}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-                          <span className="truncate text-xs font-medium">
-                            {sc.label}
-                          </span>
-                          <span
-                            title={`${done} เสร็จ · ${total - done} ค้าง${
-                              overdue > 0 ? ` · ${overdue} เกินกำหนด` : ""
-                            }`}
-                            className={cn(
-                              "ml-auto shrink-0 rounded-full border px-1.5 text-[10px] font-medium tabular-nums",
-                              overdue > 0
-                                ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
-                                : cleared
-                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                  : "bg-background text-muted-foreground"
-                            )}
-                          >
-                            {done}/{total}
-                          </span>
-                        </div>
-                        <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
-                          {scTasks.map(renderCard)}
-                          {scTasks.length === 0 && (
-                            <div className="flex flex-1 items-center justify-center rounded-md border border-dashed py-6 text-center text-[11px] text-muted-foreground">
-                              ลากมาที่นี่
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                {colTasks.length === 0 ? (
+                  <div className="flex flex-1 items-center justify-center p-2">
+                    <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+                      ลากงานมาที่นี่
+                    </div>
+                  </div>
+                ) : (
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <div className="space-y-3 p-2">
+                      {renderGroupedTasks(colTasks)}
+                    </div>
+                  </div>
+                )}
               </div>
             );
-          })}
-        </div>
+          }
+
+          // EXPANDED — one sub-column per member (+ Unassigned) that scroll
+          // horizontally inside the (height-capped) role column.
+          const present = colTasks.map((t) => t.person).filter(Boolean);
+          const people = [...new Set([...membersOfRole(col.role), ...present])];
+          const subCols = [
+            ...people.map((p) => ({ person: p, label: p })),
+            { person: "", label: "Unassigned" },
+          ];
+          return (
+            <div
+              key={col.role}
+              className="flex h-full max-w-[56rem] shrink-0 flex-col rounded-lg bg-muted/40 ring-1 ring-primary/30"
+            >
+              {header}
+              <div className="flex min-h-0 min-w-0 flex-1 gap-2 overflow-x-auto p-2">
+                {subCols.map((sc) => {
+                  const scTasks = colTasks.filter(
+                    (t) => (t.person || "") === sc.person
+                  );
+                  const { done, overdue, total } = countsFor(
+                    scTasks,
+                    projectById,
+                    today
+                  );
+                  const cleared = total > 0 && done === total;
+                  const isUnassigned = sc.person === "";
+                  const key = `${col.role}::${sc.person}`;
+                  const isOver = overColumn === key;
+                  return (
+                    <div
+                      key={sc.person || "__unassigned__"}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setOverColumn(key);
+                      }}
+                      onDragLeave={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setOverColumn((c) => (c === key ? null : c));
+                        }
+                      }}
+                      onDrop={(e) => handleDrop(e, col.role, sc.person)}
+                      className={cn(
+                        "flex h-full w-56 shrink-0 flex-col rounded-md border bg-background/50 transition-colors",
+                        isOver && "bg-primary/10 ring-2 ring-primary/40"
+                      )}
+                    >
+                      <div className="flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
+                        {isUnassigned ? (
+                          <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed text-[9px] text-muted-foreground">
+                            ?
+                          </span>
+                        ) : (
+                          <Avatar className="size-5 shrink-0">
+                            <AvatarFallback className="text-[9px]">
+                              {initialsOf(sc.person)}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <span className="truncate text-xs font-medium">
+                          {sc.label}
+                        </span>
+                        <span
+                          title={`${done} เสร็จ · ${total - done} ค้าง${
+                            overdue > 0 ? ` · ${overdue} เกินกำหนด` : ""
+                          }`}
+                          className={cn(
+                            "ml-auto shrink-0 rounded-full border px-1.5 text-[10px] font-medium tabular-nums",
+                            overdue > 0
+                              ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
+                              : cleared
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                : "bg-background text-muted-foreground"
+                          )}
+                        >
+                          {done}/{total}
+                        </span>
+                      </div>
+                      {scTasks.length === 0 ? (
+                        <div className="flex flex-1 items-center justify-center p-2">
+                          <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed text-center text-[11px] text-muted-foreground">
+                            ลากมาที่นี่
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="min-h-0 flex-1 overflow-y-auto">
+                          <div className="space-y-3 p-2">
+                            {renderGroupedTasks(scTasks)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
