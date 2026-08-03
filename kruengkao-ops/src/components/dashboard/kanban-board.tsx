@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, GripVertical, Music2 } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronsLeftRight,
+  ChevronsRightLeft,
+  GripVertical,
+  Music2,
+} from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -28,49 +34,22 @@ const COLUMNS: { role: string; label: string }[] = [
   { role: UNASSIGNED, label: "Unassigned" },
 ];
 
-interface PersonBucket {
-  person: string; // "" = tasks in this role with no specific owner yet
-  tasks: Task[];
-  done: number;
-  overdue: number;
-}
-
-/**
- * Within a role column, sub-group tasks by the specific assigned person so you
- * can see each member's load and how much they've cleared. Busiest (most
- * queuing) first; the unassigned bucket sinks to the bottom. Input order is
- * preserved within each bucket (columns arrive deadline-sorted).
- */
-function bucketByPerson(
-  tasks: Task[],
+/** Done / overdue / total counts for a set of tasks (per-member sub-column). */
+function countsFor(
+  list: Task[],
   projectById: Map<string, Project>,
   today: Date
-): PersonBucket[] {
-  const map = new Map<string, PersonBucket>();
-  for (const t of tasks) {
-    const key = t.person || "";
-    let b = map.get(key);
-    if (!b) {
-      b = { person: key, tasks: [], done: 0, overdue: 0 };
-      map.set(key, b);
-    }
-    b.tasks.push(t);
-    if (t.status === "Done") b.done += 1;
+): { done: number; overdue: number; total: number } {
+  let done = 0;
+  let overdue = 0;
+  for (const t of list) {
+    if (t.status === "Done") done += 1;
     else {
       const p = projectById.get(t.projectId);
-      if (p && taskDeadline(t, p) < today) b.overdue += 1;
+      if (p && taskDeadline(t, p) < today) overdue += 1;
     }
   }
-  return [...map.values()].sort((a, b) => {
-    if ((a.person === "") !== (b.person === "")) return a.person === "" ? 1 : -1;
-    const ra = a.tasks.length - a.done;
-    const rb = b.tasks.length - b.done;
-    return (
-      rb - ra ||
-      b.tasks.length - a.tasks.length ||
-      a.person.localeCompare(b.person)
-    );
-  });
+  return { done, overdue, total: list.length };
 }
 
 // Department accent colors for the column header dot
@@ -270,6 +249,20 @@ export function KanbanBoard({
   const [overColumn, setOverColumn] = React.useState<string | null>(null);
   const [projectFilter, setProjectFilter] = React.useState<string>(ALL_PROJECTS);
   const [hideDone, setHideDone] = React.useState(false);
+  // Role columns are unified by default; expanding one breaks it out into
+  // side-by-side per-member sub-columns. Others stay collapsed.
+  const [expandedRoles, setExpandedRoles] = React.useState<Set<string>>(
+    () => new Set()
+  );
+  const { membersOfRole } = useTeam();
+
+  const toggleRole = (role: string) =>
+    setExpandedRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(role)) next.delete(role);
+      else next.add(role);
+      return next;
+    });
 
   const projectById = React.useMemo(() => {
     const map = new Map<string, Project>();
@@ -306,14 +299,37 @@ export function KanbanBoard({
     return sortedVisibleTasks.filter((t) => (t.role || UNASSIGNED) === role);
   }
 
-  function handleDrop(e: React.DragEvent, role: string) {
+  // Drop onto a collapsed column (person "") sets the role and clears the owner;
+  // drop onto a per-member sub-column sets role AND that person in one move.
+  function handleDrop(e: React.DragEvent, role: string, person: string) {
     e.preventDefault();
     const taskId = e.dataTransfer.getData("text/plain");
-    // Moving departments resets the specific person (new team, new owner)
-    if (taskId) onTaskUpdate(taskId, { role, person: "" });
+    if (taskId) onTaskUpdate(taskId, { role, person });
     setOverColumn(null);
     setDraggingId(null);
   }
+
+  // A single card renderer reused by both the collapsed column and sub-columns.
+  const renderCard = (task: Task) => {
+    const project = projectById.get(task.projectId);
+    if (!project) return null;
+    return (
+      <TaskCard
+        key={task.id}
+        task={task}
+        project={project}
+        isDragging={draggingId === task.id}
+        onDragStart={(e, cardEl) => {
+          e.dataTransfer.setData("text/plain", task.id);
+          e.dataTransfer.effectAllowed = "move";
+          if (cardEl) e.dataTransfer.setDragImage(cardEl, 20, 20);
+          setDraggingId(task.id);
+        }}
+        onDragEnd={() => setDraggingId(null)}
+        onPersonChange={(person) => onTaskUpdate(task.id, { person })}
+      />
+    );
+  };
 
   return (
     <div className="space-y-3">
@@ -345,119 +361,170 @@ export function KanbanBoard({
       </div>
 
       <div className="overflow-x-auto rounded-xl border p-3">
-        <div className="flex gap-3">
+        <div className="flex items-start gap-3">
           {COLUMNS.map((col) => {
             const colTasks = tasksForColumn(col.role);
-            const isOver = overColumn === col.role;
+            const canExpand = col.role !== UNASSIGNED;
+            const expanded = canExpand && expandedRoles.has(col.role);
+
+            const header = (
+              <div className="flex items-center gap-2 border-b px-3 py-2">
+                <span
+                  className={cn(
+                    "size-2.5 shrink-0 rounded-full",
+                    ROLE_DOT[col.role] ?? "bg-muted-foreground/40"
+                  )}
+                />
+                <span className="text-sm font-semibold">{col.label}</span>
+                <span className="ml-auto rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground">
+                  {colTasks.length}
+                </span>
+                {canExpand && (
+                  <button
+                    type="button"
+                    onClick={() => toggleRole(col.role)}
+                    aria-label={
+                      expanded
+                        ? `ยุบ ${col.label} เป็นคอลัมน์เดียว`
+                        : `ขยาย ${col.label} แยกตามผู้รับผิดชอบ`
+                    }
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                  >
+                    {expanded ? (
+                      <ChevronsRightLeft className="size-4" />
+                    ) : (
+                      <ChevronsLeftRight className="size-4" />
+                    )}
+                  </button>
+                )}
+              </div>
+            );
+
+            // COLLAPSED — one unified column with all of the role's tasks.
+            if (!expanded) {
+              const isOver = overColumn === col.role;
+              return (
+                <div
+                  key={col.role}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setOverColumn(col.role);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setOverColumn((c) => (c === col.role ? null : c));
+                    }
+                  }}
+                  onDrop={(e) => handleDrop(e, col.role, "")}
+                  className={cn(
+                    "flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
+                    isOver && "bg-primary/10 ring-2 ring-primary/40"
+                  )}
+                >
+                  {header}
+                  <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
+                    {colTasks.map(renderCard)}
+                    {colTasks.length === 0 && (
+                      <div className="flex flex-1 items-center justify-center rounded-md border border-dashed py-6 text-xs text-muted-foreground">
+                        ลากงานมาที่นี่
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            // EXPANDED — one sub-column per member (+ Unassigned), side by side.
+            const present = colTasks.map((t) => t.person).filter(Boolean);
+            const people = [...new Set([...membersOfRole(col.role), ...present])];
+            const subCols = [
+              ...people.map((p) => ({ person: p, label: p })),
+              { person: "", label: "Unassigned" },
+            ];
             return (
               <div
                 key={col.role}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  setOverColumn(col.role);
-                }}
-                onDragLeave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                    setOverColumn((c) => (c === col.role ? null : c));
-                  }
-                }}
-                onDrop={(e) => handleDrop(e, col.role)}
-                className={cn(
-                  "flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
-                  isOver && "bg-primary/10 ring-2 ring-primary/40"
-                )}
+                className="flex shrink-0 flex-col rounded-lg bg-muted/40 ring-1 ring-primary/30"
               >
-                <div className="flex items-center gap-2 border-b px-3 py-2">
-                  <span
-                    className={cn(
-                      "size-2.5 shrink-0 rounded-full",
-                      ROLE_DOT[col.role] ?? "bg-muted-foreground/40"
-                    )}
-                  />
-                  <span className="text-sm font-semibold">{col.label}</span>
-                  <span className="ml-auto rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground">
-                    {colTasks.length}
-                  </span>
-                </div>
-
-                <div className="flex min-h-24 flex-1 flex-col gap-3 p-2">
-                  {bucketByPerson(colTasks, projectById, today).map((bucket) => {
-                    const total = bucket.tasks.length;
-                    const queuing = total - bucket.done;
-                    const cleared = queuing === 0;
-                    const isUnassigned = bucket.person === "";
+                {header}
+                <div className="flex items-start gap-2 p-2">
+                  {subCols.map((sc) => {
+                    const scTasks = colTasks.filter(
+                      (t) => (t.person || "") === sc.person
+                    );
+                    const { done, overdue, total } = countsFor(
+                      scTasks,
+                      projectById,
+                      today
+                    );
+                    const cleared = total > 0 && done === total;
+                    const isUnassigned = sc.person === "";
+                    const key = `${col.role}::${sc.person}`;
+                    const isOver = overColumn === key;
                     return (
-                      <div key={bucket.person || "__unassigned__"} className="space-y-1.5">
-                        {/* Per-person sub-header: who + cleared/total load */}
-                        <div className="flex items-center gap-1.5 px-0.5">
+                      <div
+                        key={sc.person || "__unassigned__"}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          setOverColumn(key);
+                        }}
+                        onDragLeave={(e) => {
+                          if (
+                            !e.currentTarget.contains(e.relatedTarget as Node)
+                          ) {
+                            setOverColumn((c) => (c === key ? null : c));
+                          }
+                        }}
+                        onDrop={(e) => handleDrop(e, col.role, sc.person)}
+                        className={cn(
+                          "flex w-56 shrink-0 flex-col rounded-md border bg-background/50 transition-colors",
+                          isOver && "bg-primary/10 ring-2 ring-primary/40"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5 border-b px-2 py-1.5">
                           {isUnassigned ? (
-                            <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-dashed text-[8px] text-muted-foreground">
+                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed text-[9px] text-muted-foreground">
                               ?
                             </span>
                           ) : (
-                            <Avatar className="size-4 shrink-0">
-                              <AvatarFallback className="text-[8px]">
-                                {initialsOf(bucket.person)}
+                            <Avatar className="size-5 shrink-0">
+                              <AvatarFallback className="text-[9px]">
+                                {initialsOf(sc.person)}
                               </AvatarFallback>
                             </Avatar>
                           )}
                           <span className="truncate text-xs font-medium">
-                            {isUnassigned ? "Unassigned" : bucket.person}
+                            {sc.label}
                           </span>
                           <span
-                            title={`${bucket.done} เสร็จ · ${queuing} ค้าง${
-                              bucket.overdue > 0
-                                ? ` · ${bucket.overdue} เกินกำหนด`
-                                : ""
+                            title={`${done} เสร็จ · ${total - done} ค้าง${
+                              overdue > 0 ? ` · ${overdue} เกินกำหนด` : ""
                             }`}
                             className={cn(
                               "ml-auto shrink-0 rounded-full border px-1.5 text-[10px] font-medium tabular-nums",
-                              bucket.overdue > 0
+                              overdue > 0
                                 ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
                                 : cleared
                                   ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                   : "bg-background text-muted-foreground"
                             )}
                           >
-                            {bucket.done}/{total}
+                            {done}/{total}
                           </span>
                         </div>
-
-                        {/* That person's task cards */}
-                        <div className="flex flex-col gap-2">
-                          {bucket.tasks.map((task) => {
-                            const project = projectById.get(task.projectId);
-                            if (!project) return null;
-                            return (
-                              <TaskCard
-                                key={task.id}
-                                task={task}
-                                project={project}
-                                isDragging={draggingId === task.id}
-                                onDragStart={(e, cardEl) => {
-                                  e.dataTransfer.setData("text/plain", task.id);
-                                  e.dataTransfer.effectAllowed = "move";
-                                  if (cardEl)
-                                    e.dataTransfer.setDragImage(cardEl, 20, 20);
-                                  setDraggingId(task.id);
-                                }}
-                                onDragEnd={() => setDraggingId(null)}
-                                onPersonChange={(person) =>
-                                  onTaskUpdate(task.id, { person })
-                                }
-                              />
-                            );
-                          })}
+                        <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
+                          {scTasks.map(renderCard)}
+                          {scTasks.length === 0 && (
+                            <div className="flex flex-1 items-center justify-center rounded-md border border-dashed py-6 text-center text-[11px] text-muted-foreground">
+                              ลากมาที่นี่
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
-                  {colTasks.length === 0 && (
-                    <div className="flex flex-1 items-center justify-center rounded-md border border-dashed py-6 text-xs text-muted-foreground">
-                      ลากงานมาที่นี่
-                    </div>
-                  )}
                 </div>
               </div>
             );
