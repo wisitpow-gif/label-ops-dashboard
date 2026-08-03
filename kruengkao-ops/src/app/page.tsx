@@ -1,16 +1,29 @@
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { getCurrentUserEmail, getDashboardData } from "@/lib/queries";
+import { TeamProvider } from "@/components/team/team-provider";
+import { toRoleGroups } from "@/lib/team";
+import {
+  getCurrentUserEmail,
+  getDashboardData,
+  getTaskTemplates,
+  getTeamMembers,
+} from "@/lib/queries";
 
 export default async function Home() {
-  const [{ projects, tasks }, userEmail] = await Promise.all([
-    getDashboardData(),
-    getCurrentUserEmail(),
-  ]);
+  const [{ projects, tasks }, userEmail, members, templates] =
+    await Promise.all([
+      getDashboardData(),
+      getCurrentUserEmail(),
+      getTeamMembers(),
+      getTaskTemplates(),
+    ]);
   return (
-    <DashboardShell
-      initialProjects={projects}
-      initialTasks={tasks}
-      userEmail={userEmail}
-    />
+    <TeamProvider groups={toRoleGroups(members)}>
+      <DashboardShell
+        initialProjects={projects}
+        initialTasks={tasks}
+        userEmail={userEmail}
+        taskTemplates={templates}
+      />
+    </TeamProvider>
   );
 }

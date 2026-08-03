@@ -23,47 +23,23 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatShort, parseDate, startOfToday, toISODate } from "@/lib/dates";
-import {
-  TEAM_STRUCTURE,
-  UNASSIGNED,
-  initialsOf,
-  membersOfRole,
-  taskDeadline,
-} from "@/lib/mock-data";
+import { UNASSIGNED, initialsOf, taskDeadline } from "@/lib/mock-data";
+import { membersOfRoleIn, type RoleGroup } from "@/lib/team";
+import { useTeam } from "@/components/team/team-provider";
 import type { Project, Task, TaskDependency } from "@/lib/types";
 import { updateTask } from "@/app/actions";
 import { StatusSelect, AssigneeSelect } from "@/components/dashboard/task-controls";
 import { UserMenu } from "@/components/auth/user-menu";
 
-// ---------------------------------------------------------------------------
-// People columns: every distinct staff member across all roles, in team order,
-// preceded by an "Unassigned" bucket for tasks with no person yet.
-// (A person can belong to more than one role — e.g. "Ken" — so we de-dupe.)
-// ---------------------------------------------------------------------------
-const PEOPLE: string[] = (() => {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const g of TEAM_STRUCTURE) {
-    for (const m of g.members) {
-      if (!seen.has(m)) {
-        seen.add(m);
-        out.push(m);
-      }
-    }
-  }
-  return out;
-})();
-
-const COLUMNS: { key: string; label: string }[] = [
-  { key: UNASSIGNED, label: "Unassigned" },
-  ...PEOPLE.map((p) => ({ key: p, label: p })),
-];
-
 /** Role to record when reassigning to `person`: keep the current one if it
  *  already contains them, else fall back to their first home role. */
-function roleForPerson(person: string, currentRole: string): string {
-  if (membersOfRole(currentRole).includes(person)) return currentRole;
-  const g = TEAM_STRUCTURE.find((grp) => grp.members.includes(person));
+function roleForPerson(
+  person: string,
+  currentRole: string,
+  groups: RoleGroup[]
+): string {
+  if (membersOfRoleIn(groups, currentRole).includes(person)) return currentRole;
+  const g = groups.find((grp) => grp.members.includes(person));
   return g ? g.role : currentRole;
 }
 
@@ -219,11 +195,31 @@ export function WorkloadBoard({
   const [hideDone, setHideDone] = React.useState(false);
   const [hideEmpty, setHideEmpty] = React.useState(false);
 
+  const { groups, people } = useTeam();
+
   const projectById = React.useMemo(() => {
     const map = new Map<string, Project>();
     projects.forEach((p) => map.set(p.id, p));
     return map;
   }, [projects]);
+
+  // People columns: the DB roster first, plus anyone who already has a task
+  // but isn't on the roster (legacy) so no one is hidden. Unassigned leads.
+  const columns = React.useMemo(() => {
+    const seen = new Set<string>(people);
+    const extras: string[] = [];
+    for (const t of tasks) {
+      if (t.person && !seen.has(t.person)) {
+        seen.add(t.person);
+        extras.push(t.person);
+      }
+    }
+    return [
+      { key: UNASSIGNED, label: "Unassigned" },
+      ...people.map((p) => ({ key: p, label: p })),
+      ...extras.map((p) => ({ key: p, label: p })),
+    ];
+  }, [people, tasks]);
 
   // Fast status lookup for the hard-gate check.
   const statusById = React.useMemo(() => {
@@ -313,7 +309,7 @@ export function WorkloadBoard({
       if (task.person === columnKey) return; // dropped on its own column
       handleTaskUpdate(taskId, {
         person: columnKey,
-        role: roleForPerson(columnKey, task.role),
+        role: roleForPerson(columnKey, task.role, groups),
       });
     }
   }
@@ -324,7 +320,7 @@ export function WorkloadBoard({
       string,
       { active: number; overdue: number }
     >();
-    for (const col of COLUMNS) stats.set(col.key, { active: 0, overdue: 0 });
+    for (const col of columns) stats.set(col.key, { active: 0, overdue: 0 });
     for (const t of tasks) {
       if (!projectById.has(t.projectId)) continue;
       const key = t.person || UNASSIGNED;
@@ -338,13 +334,13 @@ export function WorkloadBoard({
       }
     }
     return stats;
-  }, [tasks, projectById, today]);
+  }, [tasks, projectById, today, columns]);
 
   const visibleColumns = hideEmpty
-    ? COLUMNS.filter(
+    ? columns.filter(
         (c) => c.key === UNASSIGNED || tasksForColumn(c.key).length > 0
       )
-    : COLUMNS;
+    : columns;
 
   return (
     <TooltipProvider delayDuration={150}>

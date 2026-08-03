@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { TEAM_STRUCTURE, UNASSIGNED, initialsOf } from "@/lib/mock-data";
+import { UNASSIGNED, initialsOf } from "@/lib/mock-data";
+import { useTeam } from "@/components/team/team-provider";
 import type { TaskStatus } from "@/lib/types";
 import { STATUS_LABELS, STATUS_OPTIONS, STATUS_STYLES } from "./status-badge";
 
@@ -95,6 +96,7 @@ export function AssigneeSelect({
   person: string;
   onChange: (patch: { role: string; person: string }) => void;
 }) {
+  const { groups } = useTeam();
   const value = person ? encode(role, person) : UNASSIGNED;
 
   function handleChange(v: string) {
@@ -146,7 +148,7 @@ export function AssigneeSelect({
         <SelectItem value={UNASSIGNED}>
           <span className="text-muted-foreground">Unassigned</span>
         </SelectItem>
-        {TEAM_STRUCTURE.map((group) => (
+        {groups.map((group) => (
           <SelectGroup key={group.role}>
             <SelectSeparator />
             <SelectLabel>{group.role}</SelectLabel>

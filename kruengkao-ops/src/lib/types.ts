@@ -9,6 +9,13 @@ export type ProjectType = "Single" | "Album" | "Live Session" | "Other";
 
 export type WorkType = "Release" | "Internal";
 
+/** A person on the team, assignable to tasks in their role (DB-backed roster). */
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+}
+
 /** A prerequisite edge: `taskId` is gated by `dependsOnTaskId` (hard gate). */
 export interface TaskDependency {
   id: string;

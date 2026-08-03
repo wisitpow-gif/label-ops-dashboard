@@ -12,6 +12,7 @@ import {
   Settings,
   SquareKanban,
   Table2,
+  UserCog,
   Users,
 } from "lucide-react";
 
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/tooltip";
 import { parseDate, toISODate } from "@/lib/dates";
 import { PROJECT_TYPES } from "@/lib/constants";
-import type { Project, ProjectType, Task } from "@/lib/types";
+import type { Project, ProjectType, Task, TaskTemplate } from "@/lib/types";
 import { toast } from "sonner";
 
 import {
@@ -46,6 +47,7 @@ import { KanbanBoard } from "./kanban-board";
 import {
   ProjectFormDialog,
   type NewProjectInput,
+  type ProjectFormSubmit,
 } from "./project-form-dialog";
 import { ProjectDetailsSheet } from "./project-details-sheet";
 import { ProjectTable } from "./project-table";
@@ -54,10 +56,12 @@ export function DashboardShell({
   initialProjects,
   initialTasks,
   userEmail,
+  taskTemplates = [],
 }: {
   initialProjects: Project[];
   initialTasks: Task[];
   userEmail?: string | null;
+  taskTemplates?: TaskTemplate[];
 }) {
   const [projects, setProjects] = React.useState<Project[]>(initialProjects);
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
@@ -72,13 +76,14 @@ export function DashboardShell({
   const [editProject, setEditProject] = React.useState<Project | null>(null);
 
   // Persist the new project + its template tasks, then merge into local state.
-  async function handleCreate(values: NewProjectInput) {
+  async function handleCreate(values: ProjectFormSubmit) {
     const { project, tasks: newTasks } = await createProject({
       songTitle: values.songTitle,
       artist: values.artist,
       label: values.label,
       projectType: values.projectType,
       releaseDate: toISODate(values.releaseDate),
+      assignments: values.assignments,
     });
     setProjects((prev) => [...prev, project]);
     setTasks((prev) => [...prev, ...newTasks]);
@@ -262,6 +267,16 @@ export function DashboardShell({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="icon" aria-label="Team Members">
+                  <Link href="/settings">
+                    <UserCog />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Team Members</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button asChild variant="outline" size="icon" aria-label="Workflow Templates">
                   <Link href="/settings/templates">
                     <Settings />
@@ -325,6 +340,7 @@ export function DashboardShell({
           open={createOpen}
           onOpenChange={setCreateOpen}
           onSubmit={handleCreate}
+          taskTemplates={taskTemplates}
         />
 
         {/* Edit (pre-populated; keyed so the form re-inits per project) */}

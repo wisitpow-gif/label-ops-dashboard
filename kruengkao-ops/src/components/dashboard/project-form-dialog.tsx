@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, Sparkles } from "lucide-react";
+import { CalendarDays, Sparkles, Users } from "lucide-react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -34,6 +34,9 @@ import {
 import { cn } from "@/lib/utils";
 import { formatFull } from "@/lib/dates";
 import { LABELS, PROJECT_TYPES, artistsForLabel } from "@/lib/constants";
+import { TEAM_ROLES } from "@/lib/team";
+import { useTeam } from "@/components/team/team-provider";
+import type { TaskTemplate } from "@/lib/types";
 
 const formSchema = z.object({
   songTitle: z.string().min(1, "กรอกชื่อเพลง"),
@@ -53,24 +56,39 @@ const EMPTY: Partial<NewProjectInput> = {
   releaseDate: undefined,
 };
 
+// Radix Select can't use "" as an item value; sentinel for "leave unassigned".
+const NONE = "__none__";
+
 /**
  * Controlled create/edit dialog for a project (Phase 1 fields).
  * In "edit" mode it pre-populates from `values`.
  */
+export type ProjectFormSubmit = NewProjectInput & {
+  assignments?: Record<string, string>;
+};
+
 export function ProjectFormDialog({
   open,
   onOpenChange,
   mode,
   values,
   onSubmit,
+  taskTemplates = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
   values?: NewProjectInput;
-  onSubmit: (values: NewProjectInput) => void | Promise<void>;
+  onSubmit: (values: ProjectFormSubmit) => void | Promise<void>;
+  /** Templates (all types) — used to know which roles a new project will need. */
+  taskTemplates?: TaskTemplate[];
 }) {
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const { membersOfRole } = useTeam();
+  // Explicit per-role picks; unset roles fall back to the role's first member.
+  const [assignments, setAssignments] = React.useState<Record<string, string>>(
+    {}
+  );
 
   const form = useForm<NewProjectInput>({
     resolver: zodResolver(formSchema),
@@ -96,9 +114,29 @@ export function ProjectFormDialog({
     return list;
   }, [selectedLabel, selectedArtist]);
 
+  // Distinct roles the selected project type's tasks will use — one assignment
+  // dropdown per role, ordered by the canonical department order.
+  const selectedType = useWatch({ control: form.control, name: "projectType" });
+  const rolesForType = React.useMemo(() => {
+    const roles = new Set<string>();
+    for (const t of taskTemplates) {
+      if (t.projectType === selectedType && t.role) roles.add(t.role);
+    }
+    const rank = (r: string) => {
+      const i = (TEAM_ROLES as readonly string[]).indexOf(r);
+      return i === -1 ? TEAM_ROLES.length : i;
+    };
+    return [...roles].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  }, [taskTemplates, selectedType]);
+
+  // Unset roles default to the first member of that role (never unassigned).
+  const resolvedAssignee = (role: string) =>
+    assignments[role] ?? membersOfRole(role)[0] ?? "";
+
   function handleOpenChange(next: boolean) {
     if (!next) {
       setSaveError(null);
+      setAssignments({});
       form.reset(values ?? EMPTY);
     }
     onOpenChange(next);
@@ -107,9 +145,22 @@ export function ProjectFormDialog({
   async function handleSubmit(formValues: NewProjectInput) {
     setSaveError(null);
     try {
-      await onSubmit(formValues);
+      const payload: ProjectFormSubmit = { ...formValues };
+      if (!isEdit) {
+        // Resolve every needed role to a concrete person (default = first member).
+        const final: Record<string, string> = {};
+        for (const role of rolesForType) {
+          const person = resolvedAssignee(role);
+          if (person) final[role] = person;
+        }
+        payload.assignments = final;
+      }
+      await onSubmit(payload);
       onOpenChange(false);
-      if (!isEdit) form.reset(EMPTY);
+      if (!isEdit) {
+        form.reset(EMPTY);
+        setAssignments({});
+      }
     } catch (err) {
       setSaveError(
         err instanceof Error ? err.message : "บันทึกไม่สำเร็จ ลองอีกครั้ง"
@@ -291,6 +342,55 @@ export function ProjectFormDialog({
               <FieldError errors={[errors.releaseDate]} />
             </Field>
           </FieldGroup>
+
+          {/* Auto-assign: one dropdown per role the new project's tasks use */}
+          {!isEdit && rolesForType.length > 0 && (
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                <Users className="size-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Team Assignments</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                เลือกผู้รับผิดชอบแต่ละแผนก — งานที่สร้างจะถูกมอบหมายให้อัตโนมัติ
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {rolesForType.map((role) => {
+                  const members = membersOfRole(role);
+                  const value = resolvedAssignee(role);
+                  return (
+                    <div key={role} className="space-y-1.5">
+                      <FieldLabel>{role}</FieldLabel>
+                      <Select
+                        value={value || NONE}
+                        onValueChange={(v) =>
+                          setAssignments((prev) => ({
+                            ...prev,
+                            [role]: v === NONE ? "" : v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="ยังไม่ระบุ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE}>
+                            <span className="text-muted-foreground">
+                              ยังไม่ระบุ
+                            </span>
+                          </SelectItem>
+                          {members.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {saveError && (
             <p className="text-sm text-destructive" role="alert">

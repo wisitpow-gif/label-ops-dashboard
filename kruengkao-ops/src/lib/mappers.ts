@@ -8,6 +8,7 @@ import type {
   TaskGroup,
   TaskStatus,
   TaskTemplate,
+  TeamMember,
   WorkType,
 } from "./types";
 
@@ -136,4 +137,14 @@ export function mapTaskDependency(row: TaskDependencyRow): TaskDependency {
     taskId: row.task_id,
     dependsOnTaskId: row.depends_on_task_id,
   };
+}
+
+export interface TeamMemberRow {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export function mapTeamMember(row: TeamMemberRow): TeamMember {
+  return { id: row.id, name: row.name, role: row.role };
 }

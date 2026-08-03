@@ -7,11 +7,13 @@ import {
   mapTask,
   mapTaskDependency,
   mapTaskTemplate,
+  mapTeamMember,
   type ProjectAssetRow,
   type ProjectRow,
   type TaskDependencyRow,
   type TaskRow,
   type TaskTemplateRow,
+  type TeamMemberRow,
 } from "@/lib/mappers";
 import type {
   Project,
@@ -19,6 +21,7 @@ import type {
   Task,
   TaskDependency,
   TaskTemplate,
+  TeamMember,
 } from "@/lib/types";
 
 /** Email of the currently authenticated user (null if somehow unauthenticated). */
@@ -190,6 +193,18 @@ export async function getProjectAssets(
 
   if (error) throw new Error(error.message);
   return (data as ProjectAssetRow[]).map(mapProjectAsset);
+}
+
+/** The full team roster (DB source of truth), ordered by role then name. */
+export async function getTeamMembers(): Promise<TeamMember[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("id, name, role")
+    .order("role")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data as TeamMemberRow[]).map(mapTeamMember);
 }
 
 /** All configurable task templates, ordered by type then sort order. */

@@ -14,20 +14,16 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatShort, startOfToday, toISODate } from "@/lib/dates";
-import {
-  ROLES,
-  UNASSIGNED,
-  initialsOf,
-  membersOfRole,
-  taskDeadline,
-} from "@/lib/mock-data";
+import { UNASSIGNED, initialsOf, taskDeadline } from "@/lib/mock-data";
+import { TEAM_ROLES } from "@/lib/team";
+import { useTeam } from "@/components/team/team-provider";
 import type { Project, Task } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
 
 // Columns represent ROLES (departments). Unassigned bucket comes first.
 const COLUMNS: { role: string; label: string }[] = [
   { role: UNASSIGNED, label: "Unassigned" },
-  ...ROLES.map((role) => ({ role, label: role })),
+  ...TEAM_ROLES.map((role) => ({ role, label: role })),
 ];
 
 // Department accent colors for the column header dot
@@ -66,6 +62,7 @@ function PersonSelect({
   person: string;
   onChange: (person: string) => void;
 }) {
+  const { membersOfRole } = useTeam();
   const members = membersOfRole(role);
   if (members.length === 0) return null;
 

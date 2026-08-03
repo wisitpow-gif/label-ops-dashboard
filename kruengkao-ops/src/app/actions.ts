@@ -9,11 +9,13 @@ import {
   mapTask,
   mapTaskDependency,
   mapTaskTemplate,
+  mapTeamMember,
   type ProjectAssetRow,
   type ProjectRow,
   type TaskDependencyRow,
   type TaskRow,
   type TaskTemplateRow,
+  type TeamMemberRow,
 } from "@/lib/mappers";
 import type {
   Project,
@@ -21,6 +23,7 @@ import type {
   Task,
   TaskDependency,
   TaskTemplate,
+  TeamMember,
 } from "@/lib/types";
 
 const ASSET_COLS =
@@ -38,6 +41,8 @@ export interface CreateProjectInput {
   label: string;
   projectType: string;
   releaseDate: string; // yyyy-mm-dd
+  /** Role → person chosen in the form; auto-assigns each generated task. */
+  assignments?: Record<string, string>;
 }
 
 /**
@@ -77,6 +82,9 @@ export async function createProject(
     throw new Error(tmplErr.message);
   }
 
+  // Auto-assign each generated task to the person chosen for its role
+  // (so projects start fully staffed rather than all-unassigned).
+  const assignments = input.assignments ?? {};
   const taskRows = (templates ?? []).map((t, i) => ({
     id: crypto.randomUUID(),
     project_id: projectRow.id,
@@ -84,7 +92,7 @@ export async function createProject(
     category: t.category,
     task_name: t.task_name,
     role: t.role,
-    assigned_to: null,
+    assigned_to: assignments[t.role]?.trim() || null,
     status: "Not Start",
     t_minus_days: t.t_minus_days,
     duration_days: t.duration_days,
@@ -318,6 +326,53 @@ export async function deleteTaskTemplate(id: string): Promise<void> {
   const { error } = await supabase.from("task_templates").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/settings/templates");
+}
+
+// ---------------------------------------------------------------------------
+// Team members (Settings → Team) — DB-backed Role → Person roster
+// ---------------------------------------------------------------------------
+
+const TEAM_MEMBER_COLS = "id, name, role";
+
+export interface TeamMemberInput {
+  name: string;
+  role: string;
+}
+
+export async function createTeamMember(
+  input: TeamMemberInput
+): Promise<TeamMember> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_members")
+    .insert({ name: input.name.trim(), role: input.role })
+    .select(TEAM_MEMBER_COLS)
+    .single();
+  if (error) throw new Error(error.message);
+  revalidatePath("/settings");
+  return mapTeamMember(data as TeamMemberRow);
+}
+
+export async function updateTeamMember(
+  input: { id: string } & TeamMemberInput
+): Promise<TeamMember> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_members")
+    .update({ name: input.name.trim(), role: input.role })
+    .eq("id", input.id)
+    .select(TEAM_MEMBER_COLS)
+    .single();
+  if (error) throw new Error(error.message);
+  revalidatePath("/settings");
+  return mapTeamMember(data as TeamMemberRow);
+}
+
+export async function deleteTeamMember(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("team_members").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/settings");
 }
 
 export interface SyncResult {
