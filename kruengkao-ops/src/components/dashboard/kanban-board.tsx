@@ -45,6 +45,11 @@ function isTerminalColumn(columnKey: string): boolean {
   return columnKey === "Distributor" || columnKey === UNASSIGNED;
 }
 
+// Collapse state is keyed per (column, project) so folding a project in one
+// role column never affects the same project in the other columns.
+const groupKey = (columnRole: string, projectId: string) =>
+  `${columnRole}::${projectId}`;
+
 /** Done / overdue / total counts for a set of tasks (per-member sub-column). */
 function countsFor(
   list: Task[],
@@ -299,16 +304,17 @@ export function KanbanBoard({
       return next;
     });
 
-  // Collapsed project groups, keyed by projectId and shared across every
-  // column so a project folds/unfolds board-wide at once.
-  const [collapsedProjects, setCollapsedProjects] = React.useState<Set<string>>(
+  // Collapsed project groups, keyed per (column, project) so folding a project
+  // in one column leaves the same project untouched in the others.
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(
     () => new Set()
   );
-  const toggleProject = (projectId: string) =>
-    setCollapsedProjects((prev) => {
+  const toggleGroup = (columnRole: string, projectId: string) =>
+    setCollapsedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(projectId)) next.delete(projectId);
-      else next.add(projectId);
+      const key = groupKey(columnRole, projectId);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 
@@ -346,21 +352,21 @@ export function KanbanBoard({
       .sort((a, b) => deadlineKey(a).localeCompare(deadlineKey(b)));
   }, [tasks, projectById, effectiveProject, hideDone]);
 
-  // Projects currently on the board — drives the global Collapse/Expand All.
-  const visibleProjectIds = React.useMemo(() => {
-    const ids = new Set<string>();
-    for (const t of sortedVisibleTasks) ids.add(t.projectId);
-    return [...ids];
+  // Every (column, project) group on the board — drives Collapse/Expand All.
+  const allGroupKeys = React.useMemo(() => {
+    const keys = new Set<string>();
+    for (const t of sortedVisibleTasks) {
+      keys.add(groupKey(t.role || UNASSIGNED, t.projectId));
+    }
+    return keys;
   }, [sortedVisibleTasks]);
 
   const everyCollapsed =
-    visibleProjectIds.length > 0 &&
-    visibleProjectIds.every((id) => collapsedProjects.has(id));
+    allGroupKeys.size > 0 &&
+    [...allGroupKeys].every((k) => collapsedGroups.has(k));
 
   const toggleAll = () =>
-    setCollapsedProjects(
-      everyCollapsed ? new Set() : new Set(visibleProjectIds)
-    );
+    setCollapsedGroups(everyCollapsed ? new Set() : new Set(allGroupKeys));
 
   const today = startOfToday();
 
@@ -420,12 +426,12 @@ export function KanbanBoard({
       const project = projectById.get(pid);
       if (!project) return null;
       const groupTasks = byProject.get(pid)!;
-      const collapsed = collapsedProjects.has(pid);
+      const collapsed = collapsedGroups.has(groupKey(columnRole, pid));
       return (
         <div key={pid} className="space-y-2">
           <button
             type="button"
-            onClick={() => toggleProject(pid)}
+            onClick={() => toggleGroup(columnRole, pid)}
             aria-expanded={!collapsed}
             className="sticky top-0 z-10 flex w-full items-center gap-1 rounded-md bg-neutral-700 px-2 py-1 text-left text-[11px] font-semibold text-neutral-50 shadow-sm dark:bg-neutral-800"
           >
@@ -482,7 +488,7 @@ export function KanbanBoard({
           variant="outline"
           size="sm"
           onClick={toggleAll}
-          disabled={visibleProjectIds.length === 0}
+          disabled={allGroupKeys.size === 0}
         >
           {everyCollapsed ? (
             <ChevronsUpDown data-icon="inline-start" />
