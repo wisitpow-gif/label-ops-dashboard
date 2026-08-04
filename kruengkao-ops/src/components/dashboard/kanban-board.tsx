@@ -34,6 +34,12 @@ const COLUMNS: { role: string; label: string }[] = [
   { role: UNASSIGNED, label: "Unassigned" },
 ];
 
+// The terminal "Outbox" gates — final hand-off. Done tasks stay visible here
+// even when Hide Done is on, and these columns get a distinct background.
+function isTerminalColumn(columnKey: string): boolean {
+  return columnKey === "Distributor" || columnKey === UNASSIGNED;
+}
+
 /** Done / overdue / total counts for a set of tasks (per-member sub-column). */
 function countsFor(
   list: Task[],
@@ -153,6 +159,7 @@ function TaskCard({
   onDragEnd,
   onPersonChange,
   compact = false,
+  dimmed = false,
 }: {
   task: Task;
   project: Project;
@@ -162,6 +169,8 @@ function TaskCard({
   onPersonChange: (person: string) => void;
   /** When grouped under a project header, drop the project block and lead with the task. */
   compact?: boolean;
+  /** Archived look for Done tasks parked in the Outbox columns. */
+  dimmed?: boolean;
 }) {
   const cardRef = React.useRef<HTMLDivElement>(null);
   const deadline = taskDeadline(task, project);
@@ -188,6 +197,7 @@ function TaskCard({
       className={cn(
         "rounded-lg border border-t-4 bg-background p-3 shadow-sm transition",
         LABEL_BORDER[project.label] ?? "border-t-border",
+        dimmed && "opacity-55 saturate-50",
         isDragging && "opacity-40"
       )}
     >
@@ -309,7 +319,12 @@ export function KanbanBoard({
       .filter(
         (t) => effectiveProject === ALL_PROJECTS || t.projectId === effectiveProject
       )
-      .filter((t) => !(hideDone && t.status === "Done"))
+      .filter((t) => {
+        // Hide Done inside active roles, but always keep it in the Outbox
+        // (Distributor / Unassigned) so hand-offs can be confirmed.
+        if (!hideDone || t.status !== "Done") return true;
+        return isTerminalColumn(t.role || UNASSIGNED);
+      })
       .sort((a, b) => deadlineKey(a).localeCompare(deadlineKey(b)));
   }, [tasks, projectById, effectiveProject, hideDone]);
 
@@ -330,15 +345,18 @@ export function KanbanBoard({
   }
 
   // A single (compact) card renderer reused by every column and sub-column.
-  const renderCard = (task: Task) => {
+  // Done tasks in the terminal Outbox columns render dimmed (archived look).
+  const renderCard = (task: Task, columnRole: string) => {
     const project = projectById.get(task.projectId);
     if (!project) return null;
+    const dimmed = task.status === "Done" && isTerminalColumn(columnRole);
     return (
       <TaskCard
         key={task.id}
         task={task}
         project={project}
         compact
+        dimmed={dimmed}
         isDragging={draggingId === task.id}
         onDragStart={(e, cardEl) => {
           e.dataTransfer.setData("text/plain", task.id);
@@ -354,7 +372,7 @@ export function KanbanBoard({
 
   // Group a column's tasks by project (preserving deadline order, so project
   // groups appear by their earliest task), each under a sticky project header.
-  const renderGroupedTasks = (list: Task[]) => {
+  const renderGroupedTasks = (list: Task[], columnRole: string) => {
     const order: string[] = [];
     const byProject = new Map<string, Task[]>();
     for (const t of list) {
@@ -373,7 +391,9 @@ export function KanbanBoard({
             <span className="opacity-60">Project:</span>
             <span className="truncate">{project.songName}</span>
           </div>
-          <div className="space-y-2">{byProject.get(pid)!.map(renderCard)}</div>
+          <div className="space-y-2">
+            {byProject.get(pid)!.map((t) => renderCard(t, columnRole))}
+          </div>
         </div>
       );
     });
@@ -415,6 +435,9 @@ export function KanbanBoard({
           const colTasks = tasksForColumn(col.role);
           const canExpand = col.role !== UNASSIGNED;
           const expanded = canExpand && expandedRoles.has(col.role);
+          const terminal = isTerminalColumn(col.role);
+          // Extra gap before the first Outbox column separates it from the pipeline.
+          const outboxGap = col.role === "Distributor" ? "ml-3" : "";
 
           const header = (
             <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
@@ -467,21 +490,26 @@ export function KanbanBoard({
                 }}
                 onDrop={(e) => handleDrop(e, col.role, "")}
                 className={cn(
-                  "flex h-full w-64 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
-                  isOver && "bg-primary/10 ring-2 ring-primary/40"
+                  "flex h-full w-64 shrink-0 flex-col rounded-lg transition-colors",
+                  outboxGap,
+                  isOver
+                    ? "bg-primary/10 ring-2 ring-primary/40"
+                    : terminal
+                      ? "bg-muted ring-1 ring-border"
+                      : "bg-muted/40"
                 )}
               >
                 {header}
                 {colTasks.length === 0 ? (
                   <div className="flex flex-1 items-center justify-center p-2">
                     <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
-                      ลากงานมาที่นี่
+                      {terminal ? "ยังไม่มีงานส่งออก" : "ลากงานมาที่นี่"}
                     </div>
                   </div>
                 ) : (
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     <div className="space-y-3 p-2">
-                      {renderGroupedTasks(colTasks)}
+                      {renderGroupedTasks(colTasks, col.role)}
                     </div>
                   </div>
                 )}
@@ -500,7 +528,11 @@ export function KanbanBoard({
           return (
             <div
               key={col.role}
-              className="flex h-full max-w-[56rem] shrink-0 flex-col rounded-lg bg-muted/40 ring-1 ring-primary/30"
+              className={cn(
+                "flex h-full max-w-[56rem] shrink-0 flex-col rounded-lg ring-1 ring-primary/30",
+                outboxGap,
+                terminal ? "bg-muted" : "bg-muted/40"
+              )}
             >
               {header}
               <div className="flex min-h-0 min-w-0 flex-1 gap-2 overflow-x-auto p-2">
@@ -576,7 +608,7 @@ export function KanbanBoard({
                       ) : (
                         <div className="min-h-0 flex-1 overflow-y-auto">
                           <div className="space-y-3 p-2">
-                            {renderGroupedTasks(scTasks)}
+                            {renderGroupedTasks(scTasks, col.role)}
                           </div>
                         </div>
                       )}
