@@ -3,13 +3,18 @@
 import * as React from "react";
 import {
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
   ChevronsLeftRight,
   ChevronsRightLeft,
+  ChevronsUpDown,
   GripVertical,
   Music2,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -294,6 +299,19 @@ export function KanbanBoard({
       return next;
     });
 
+  // Collapsed project groups, keyed by projectId and shared across every
+  // column so a project folds/unfolds board-wide at once.
+  const [collapsedProjects, setCollapsedProjects] = React.useState<Set<string>>(
+    () => new Set()
+  );
+  const toggleProject = (projectId: string) =>
+    setCollapsedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+
   const projectById = React.useMemo(() => {
     const map = new Map<string, Project>();
     projects.forEach((p) => map.set(p.id, p));
@@ -327,6 +345,22 @@ export function KanbanBoard({
       })
       .sort((a, b) => deadlineKey(a).localeCompare(deadlineKey(b)));
   }, [tasks, projectById, effectiveProject, hideDone]);
+
+  // Projects currently on the board — drives the global Collapse/Expand All.
+  const visibleProjectIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of sortedVisibleTasks) ids.add(t.projectId);
+    return [...ids];
+  }, [sortedVisibleTasks]);
+
+  const everyCollapsed =
+    visibleProjectIds.length > 0 &&
+    visibleProjectIds.every((id) => collapsedProjects.has(id));
+
+  const toggleAll = () =>
+    setCollapsedProjects(
+      everyCollapsed ? new Set() : new Set(visibleProjectIds)
+    );
 
   const today = startOfToday();
 
@@ -385,15 +419,32 @@ export function KanbanBoard({
     return order.map((pid) => {
       const project = projectById.get(pid);
       if (!project) return null;
+      const groupTasks = byProject.get(pid)!;
+      const collapsed = collapsedProjects.has(pid);
       return (
         <div key={pid} className="space-y-2">
-          <div className="sticky top-0 z-10 flex items-center gap-1 rounded-md bg-neutral-700 px-2 py-1 text-[11px] font-semibold text-neutral-50 shadow-sm dark:bg-neutral-800">
+          <button
+            type="button"
+            onClick={() => toggleProject(pid)}
+            aria-expanded={!collapsed}
+            className="sticky top-0 z-10 flex w-full items-center gap-1 rounded-md bg-neutral-700 px-2 py-1 text-left text-[11px] font-semibold text-neutral-50 shadow-sm dark:bg-neutral-800"
+          >
+            {collapsed ? (
+              <ChevronRight className="size-3 shrink-0" />
+            ) : (
+              <ChevronDown className="size-3 shrink-0" />
+            )}
             <span className="opacity-60">Project:</span>
             <span className="truncate">{project.songName}</span>
-          </div>
-          <div className="space-y-2">
-            {byProject.get(pid)!.map((t) => renderCard(t, columnRole))}
-          </div>
+            <span className="ml-auto shrink-0 rounded-full bg-white/15 px-1.5 text-[10px] tabular-nums">
+              {groupTasks.length}
+            </span>
+          </button>
+          {!collapsed && (
+            <div className="space-y-2">
+              {groupTasks.map((t) => renderCard(t, columnRole))}
+            </div>
+          )}
         </div>
       );
     });
@@ -426,6 +477,20 @@ export function KanbanBoard({
             Hide Done Tasks
           </span>
         </label>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleAll}
+          disabled={visibleProjectIds.length === 0}
+        >
+          {everyCollapsed ? (
+            <ChevronsUpDown data-icon="inline-start" />
+          ) : (
+            <ChevronsDownUp data-icon="inline-start" />
+          )}
+          {everyCollapsed ? "Expand All" : "Collapse All"}
+        </Button>
       </div>
 
       {/* Fixed-height board: columns fill the height and scroll internally, so
