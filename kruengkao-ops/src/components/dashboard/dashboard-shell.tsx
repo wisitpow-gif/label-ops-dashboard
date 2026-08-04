@@ -13,7 +13,6 @@ import {
   SquareKanban,
   Table2,
   UserCog,
-  Users,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -237,16 +236,6 @@ export function DashboardShell({
             </Button>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button asChild variant="outline" size="icon" aria-label="Team Workload">
-                  <Link href="/workload">
-                    <Users />
-                  </Link>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Team Workload</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <Button asChild variant="outline" size="icon" aria-label="Internal Work">
                   <Link href="/internal">
                     <ClipboardList />
@@ -301,7 +290,7 @@ export function DashboardShell({
             </TabsTrigger>
             <TabsTrigger value="kanban">
               <SquareKanban data-icon="inline-start" />
-              Kanban Board
+              Team Workload
             </TabsTrigger>
           </TabsList>
           <TabsContent value="table">
