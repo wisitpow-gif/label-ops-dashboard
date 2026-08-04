@@ -467,7 +467,7 @@ export function KanbanBoard({
                 }}
                 onDrop={(e) => handleDrop(e, col.role, "")}
                 className={cn(
-                  "flex h-full w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
+                  "flex h-full w-64 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors",
                   isOver && "bg-primary/10 ring-2 ring-primary/40"
                 )}
               >
@@ -532,7 +532,7 @@ export function KanbanBoard({
                       }}
                       onDrop={(e) => handleDrop(e, col.role, sc.person)}
                       className={cn(
-                        "flex h-full w-56 shrink-0 flex-col rounded-md border bg-background/50 transition-colors",
+                        "flex h-full w-52 shrink-0 flex-col rounded-md border bg-background/50 transition-colors",
                         isOver && "bg-primary/10 ring-2 ring-primary/40"
                       )}
                     >

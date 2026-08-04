@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  CalendarRange,
   ChartGantt,
   ClipboardList,
   Disc3,
@@ -41,6 +42,7 @@ import {
   updateTask,
 } from "@/app/actions";
 import { UserMenu } from "@/components/auth/user-menu";
+import { CalendarView } from "./calendar-view";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
 import {
@@ -284,13 +286,17 @@ export function DashboardShell({
               <Table2 data-icon="inline-start" />
               Project View
             </TabsTrigger>
+            <TabsTrigger value="kanban">
+              <SquareKanban data-icon="inline-start" />
+              Team Workload
+            </TabsTrigger>
             <TabsTrigger value="gantt">
               <ChartGantt data-icon="inline-start" />
               Gantt Chart
             </TabsTrigger>
-            <TabsTrigger value="kanban">
-              <SquareKanban data-icon="inline-start" />
-              Team Workload
+            <TabsTrigger value="calendar">
+              <CalendarRange data-icon="inline-start" />
+              Calendar View
             </TabsTrigger>
           </TabsList>
           <TabsContent value="table">
@@ -303,15 +309,18 @@ export function DashboardShell({
               onDeleteProject={handleDeleteProject}
             />
           </TabsContent>
-          <TabsContent value="gantt">
-            <GanttChart projects={filteredProjects} tasks={tasks} />
-          </TabsContent>
           <TabsContent value="kanban">
             <KanbanBoard
               projects={filteredProjects}
               tasks={tasks}
               onTaskUpdate={handleTaskUpdate}
             />
+          </TabsContent>
+          <TabsContent value="gantt">
+            <GanttChart projects={filteredProjects} tasks={tasks} />
+          </TabsContent>
+          <TabsContent value="calendar">
+            <CalendarView projects={filteredProjects} tasks={tasks} />
           </TabsContent>
         </Tabs>
 
