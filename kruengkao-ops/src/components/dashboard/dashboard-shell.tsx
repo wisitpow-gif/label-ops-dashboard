@@ -188,7 +188,7 @@ export function DashboardShell({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
+      <div className="w-full space-y-6 px-4 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-foreground text-background">

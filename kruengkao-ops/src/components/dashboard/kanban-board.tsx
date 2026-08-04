@@ -268,7 +268,7 @@ export function KanbanBoard({
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const [overColumn, setOverColumn] = React.useState<string | null>(null);
   const [projectFilter, setProjectFilter] = React.useState<string>(ALL_PROJECTS);
-  const [hideDone, setHideDone] = React.useState(false);
+  const [hideDone, setHideDone] = React.useState(true);
   // Role columns are unified by default; expanding one breaks it out into
   // side-by-side per-member sub-columns. Others stay collapsed.
   const [expandedRoles, setExpandedRoles] = React.useState<Set<string>>(
