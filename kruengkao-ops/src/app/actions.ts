@@ -18,6 +18,7 @@ import {
   type TeamMemberRow,
 } from "@/lib/mappers";
 import type {
+  CustomTaskInput,
   Project,
   ProjectAsset,
   Task,
@@ -43,11 +44,15 @@ export interface CreateProjectInput {
   releaseDate: string; // yyyy-mm-dd
   /** Role → person chosen in the form; auto-assigns each generated task. */
   assignments?: Record<string, string>;
+  /** Customized timeline from the Create wizard; when present, inserted
+   *  verbatim instead of generating from the project type's templates. */
+  tasks?: CustomTaskInput[];
 }
 
 /**
- * Insert a project, then generate its tasks from the task_templates rows for
- * the chosen project_type. Returns both mapped to the app's domain types.
+ * Insert a project plus its tasks (customized wizard list, or generated from
+ * the project type's templates), rolling the project back if tasks fail so a
+ * half-created project is never persisted. Returns both as domain types.
  */
 export async function createProject(
   input: CreateProjectInput
@@ -70,34 +75,69 @@ export async function createProject(
     throw new Error(projectErr?.message ?? "Failed to create project");
   }
 
-  // Pull the configured template for this project type (Settings → Templates).
-  const { data: templates, error: tmplErr } = await supabase
-    .from("task_templates")
-    .select(TEMPLATE_COLS)
-    .eq("project_type", input.projectType)
-    .order("sort_order");
-
-  if (tmplErr) {
-    await supabase.from("projects").delete().eq("id", projectRow.id);
-    throw new Error(tmplErr.message);
+  // Normalize the tasks to insert: the wizard's customized list when provided,
+  // otherwise the project type's templates with per-role auto-assignment.
+  interface TaskSpec {
+    taskKey: string | null;
+    category: string;
+    taskName: string;
+    role: string;
+    person: string | null;
+    tMinusDays: number;
+    durationDays: number;
+    sortOrder: number;
   }
 
-  // Auto-assign each generated task to the person chosen for its role
-  // (so projects start fully staffed rather than all-unassigned).
-  const assignments = input.assignments ?? {};
-  const taskRows = (templates ?? []).map((t, i) => ({
+  let specs: TaskSpec[];
+  if (input.tasks && input.tasks.length > 0) {
+    specs = input.tasks.map((t, i) => ({
+      taskKey: t.taskKey ?? null,
+      category: t.category,
+      taskName: t.taskName,
+      role: t.role,
+      person: t.person?.trim() || null,
+      tMinusDays: t.tMinusDays,
+      durationDays: t.durationDays,
+      sortOrder: t.sortOrder ?? i,
+    }));
+  } else {
+    const { data: templates, error: tmplErr } = await supabase
+      .from("task_templates")
+      .select(TEMPLATE_COLS)
+      .eq("project_type", input.projectType)
+      .order("sort_order");
+
+    if (tmplErr) {
+      await supabase.from("projects").delete().eq("id", projectRow.id);
+      throw new Error(tmplErr.message);
+    }
+
+    const assignments = input.assignments ?? {};
+    specs = (templates ?? []).map((t, i) => ({
+      taskKey: t.task_key ?? null,
+      category: t.category,
+      taskName: t.task_name,
+      role: t.role,
+      person: assignments[t.role]?.trim() || null,
+      tMinusDays: t.t_minus_days,
+      durationDays: t.duration_days,
+      sortOrder: t.sort_order ?? i,
+    }));
+  }
+
+  const taskRows = specs.map((s) => ({
     id: crypto.randomUUID(),
     project_id: projectRow.id,
-    task_key: t.task_key,
-    category: t.category,
-    task_name: t.task_name,
-    role: t.role,
-    assigned_to: assignments[t.role]?.trim() || null,
+    task_key: s.taskKey,
+    category: s.category,
+    task_name: s.taskName,
+    role: s.role,
+    assigned_to: s.person,
     status: "Not Start",
-    t_minus_days: t.t_minus_days,
-    duration_days: t.duration_days,
+    t_minus_days: s.tMinusDays,
+    duration_days: s.durationDays,
     blocked_by: null,
-    sort_order: t.sort_order ?? i,
+    sort_order: s.sortOrder,
   }));
 
   let insertedTasks: TaskRow[] = [];

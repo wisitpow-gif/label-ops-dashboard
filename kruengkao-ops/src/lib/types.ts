@@ -56,6 +56,18 @@ export interface TaskTemplate {
   sortOrder: number;
 }
 
+/** A task to insert verbatim when creating a project (wizard: customized timeline). */
+export interface CustomTaskInput {
+  taskName: string;
+  role: string;
+  person: string; // "" = unassigned
+  category: string;
+  tMinusDays: number;
+  durationDays: number;
+  taskKey?: string;
+  sortOrder: number;
+}
+
 export interface Task {
   id: string;
   projectId: string;

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, Sparkles, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Sparkles, Users } from "lucide-react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -32,11 +32,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { formatFull } from "@/lib/dates";
+import { addDays, diffDays, formatFull } from "@/lib/dates";
 import { LABELS, PROJECT_TYPES, artistsForLabel } from "@/lib/constants";
 import { TEAM_ROLES } from "@/lib/team";
 import { useTeam } from "@/components/team/team-provider";
-import type { TaskTemplate } from "@/lib/types";
+import type { CustomTaskInput, TaskTemplate } from "@/lib/types";
 
 const formSchema = z.object({
   songTitle: z.string().min(1, "กรอกชื่อเพลง"),
@@ -65,7 +65,23 @@ const NONE = "__none__";
  */
 export type ProjectFormSubmit = NewProjectInput & {
   assignments?: Record<string, string>;
+  /** Customized timeline from the Step-2 review (create wizard only). */
+  tasks?: CustomTaskInput[];
 };
+
+/** A previewed/editable task in Step 2 (deadline is absolute + editable). */
+interface DraftTask {
+  key: string;
+  taskName: string;
+  role: string;
+  person: string;
+  category: string;
+  tMinusDays: number;
+  durationDays: number;
+  taskKey: string | null;
+  sortOrder: number;
+  deadline: Date;
+}
 
 export function ProjectFormDialog({
   open,
@@ -89,6 +105,10 @@ export function ProjectFormDialog({
   const [assignments, setAssignments] = React.useState<Record<string, string>>(
     {}
   );
+  // Wizard: Step 1 = details, Step 2 = timeline review (create mode only).
+  const [step, setStep] = React.useState<1 | 2>(1);
+  const [draftTasks, setDraftTasks] = React.useState<DraftTask[]>([]);
+  const [confirming, setConfirming] = React.useState(false);
 
   const form = useForm<NewProjectInput>({
     resolver: zodResolver(formSchema),
@@ -133,38 +153,89 @@ export function ProjectFormDialog({
   const resolvedAssignee = (role: string) =>
     assignments[role] ?? membersOfRole(role)[0] ?? "";
 
+  // Build the preview timeline from the selected type's templates + assignments.
+  const computeDraftTasks = (formValues: NewProjectInput): DraftTask[] =>
+    taskTemplates
+      .filter((t) => t.projectType === formValues.projectType)
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((t) => ({
+        key: t.id,
+        taskName: t.taskName,
+        role: t.role,
+        person: resolvedAssignee(t.role),
+        category: t.category,
+        tMinusDays: t.tMinusDays,
+        durationDays: t.durationDays,
+        taskKey: t.taskKey || null,
+        sortOrder: t.sortOrder,
+        deadline: addDays(formValues.releaseDate, -t.tMinusDays),
+      }));
+
+  const updateDraft = (key: string, patch: Partial<DraftTask>) =>
+    setDraftTasks((prev) =>
+      prev.map((d) => (d.key === key ? { ...d, ...patch } : d))
+    );
+
   function handleOpenChange(next: boolean) {
     if (!next) {
       setSaveError(null);
       setAssignments({});
+      setStep(1);
+      setDraftTasks([]);
       form.reset(values ?? EMPTY);
     }
     onOpenChange(next);
   }
 
-  async function handleSubmit(formValues: NewProjectInput) {
+  // Step 1 submit: edit saves immediately; create advances to the review step.
+  async function handleFormSubmit(formValues: NewProjectInput) {
     setSaveError(null);
+    if (isEdit) {
+      try {
+        await onSubmit({ ...formValues });
+        handleOpenChange(false);
+      } catch (err) {
+        setSaveError(
+          err instanceof Error ? err.message : "บันทึกไม่สำเร็จ ลองอีกครั้ง"
+        );
+      }
+      return;
+    }
+    setDraftTasks(computeDraftTasks(formValues));
+    setStep(2);
+  }
+
+  // Step 2 confirm: create the project with the customized task list.
+  async function handleConfirm() {
+    setSaveError(null);
+    setConfirming(true);
     try {
-      const payload: ProjectFormSubmit = { ...formValues };
-      if (!isEdit) {
-        // Resolve every needed role to a concrete person (default = first member).
-        const final: Record<string, string> = {};
-        for (const role of rolesForType) {
-          const person = resolvedAssignee(role);
-          if (person) final[role] = person;
-        }
-        payload.assignments = final;
+      const formValues = form.getValues();
+      const assignmentsFinal: Record<string, string> = {};
+      for (const role of rolesForType) {
+        const person = resolvedAssignee(role);
+        if (person) assignmentsFinal[role] = person;
       }
-      await onSubmit(payload);
-      onOpenChange(false);
-      if (!isEdit) {
-        form.reset(EMPTY);
-        setAssignments({});
-      }
+      const tasks: CustomTaskInput[] = draftTasks.map((d) => ({
+        taskName: d.taskName.trim() || d.taskName,
+        role: d.role,
+        person: d.person,
+        category: d.category,
+        // Editing the deadline overrides the standard T-minus offset.
+        tMinusDays: diffDays(d.deadline, formValues.releaseDate),
+        durationDays: d.durationDays,
+        taskKey: d.taskKey ?? undefined,
+        sortOrder: d.sortOrder,
+      }));
+      await onSubmit({ ...formValues, assignments: assignmentsFinal, tasks });
+      handleOpenChange(false);
     } catch (err) {
       setSaveError(
         err instanceof Error ? err.message : "บันทึกไม่สำเร็จ ลองอีกครั้ง"
       );
+    } finally {
+      setConfirming(false);
     }
   }
 
@@ -174,25 +245,32 @@ export function ProjectFormDialog({
           dropdown menu, the menu trigger may unmount, so returning focus to
           it would crash Radix's focus scope (reading 'dispatchEvent'). */}
       <DialogContent
-        className="sm:max-w-md"
+        className={cn("sm:max-w-md", !isEdit && step === 2 && "sm:max-w-2xl")}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "Edit Project" : "Initiate New Release (Phase 1)"}
+            {isEdit
+              ? "Edit Project"
+              : step === 1
+                ? "Initiate New Release · Step 1 of 2"
+                : "Review Timeline · Step 2 of 2"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
               ? "แก้ไขข้อมูลโปรเจกต์ — Workback Timeline จะคำนวณเดดไลน์ใหม่ตามวันปล่อย"
-              : "ข้อมูลตั้งต้นโปรเจกต์ — ระบบจะ Generate Workback Timeline ให้ทันที"}
+              : step === 1
+                ? "ข้อมูลตั้งต้นโปรเจกต์ — ตรวจสอบและปรับไทม์ไลน์ได้ในขั้นถัดไป"
+                : "ปรับชื่องานและเดดไลน์ได้ก่อนยืนยันสร้างโปรเจกต์"}
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={form.handleSubmit(handleSubmit)}
-          className="space-y-6"
-          noValidate
-        >
+        {step === 1 ? (
+          <form
+            onSubmit={form.handleSubmit(handleFormSubmit)}
+            className="space-y-6"
+            noValidate
+          >
           <FieldGroup>
             {!isEdit && (
               <Field data-invalid={!!errors.projectType}>
@@ -398,22 +476,113 @@ export function ProjectFormDialog({
             </p>
           )}
 
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" disabled={isSaving}>
-                Cancel
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" disabled={isSaving}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSaving}>
+                {isEdit ? (
+                  isSaving ? (
+                    "Saving…"
+                  ) : (
+                    "Save Changes"
+                  )
+                ) : (
+                  <>
+                    Next: Review Timeline
+                    <ArrowRight data-icon="inline-end" />
+                  </>
+                )}
               </Button>
-            </DialogClose>
-            <Button type="submit" disabled={isSaving}>
-              {!isEdit && <Sparkles data-icon="inline-start" />}
-              {isSaving
-                ? "Saving…"
-                : isEdit
-                  ? "Save Changes"
-                  : "Create Project & Generate Timeline"}
-            </Button>
-          </DialogFooter>
-        </form>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-xs text-muted-foreground">
+              จะสร้าง {draftTasks.length} งาน — ปรับชื่อและเดดไลน์ได้ตามต้องการ
+            </div>
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+              {draftTasks.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  ประเภทนี้ยังไม่มี Template งาน — จะสร้างโปรเจกต์เปล่า
+                </p>
+              ) : (
+                draftTasks.map((d) => (
+                  <div
+                    key={d.key}
+                    className="space-y-2 rounded-lg border p-2.5"
+                  >
+                    <Input
+                      value={d.taskName}
+                      onChange={(e) =>
+                        updateDraft(d.key, { taskName: e.target.value })
+                      }
+                      className="h-8"
+                      placeholder="ชื่องาน"
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs text-muted-foreground">
+                        {d.role}
+                        {d.person ? ` · ${d.person}` : ""}
+                      </span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 font-normal"
+                          >
+                            <CalendarDays className="size-3.5" />
+                            {formatFull(d.deadline)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <Calendar
+                            mode="single"
+                            selected={d.deadline}
+                            onSelect={(date) =>
+                              date && updateDraft(d.key, { deadline: date })
+                            }
+                            autoFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {saveError && (
+              <p className="text-sm text-destructive" role="alert">
+                {saveError}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setStep(1)}
+                disabled={confirming}
+              >
+                <ArrowLeft data-icon="inline-start" />
+                Back
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirm}
+                disabled={confirming}
+              >
+                <Sparkles data-icon="inline-start" />
+                {confirming ? "Creating…" : "Confirm & Create Project"}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

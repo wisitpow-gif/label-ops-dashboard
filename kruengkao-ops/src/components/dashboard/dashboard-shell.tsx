@@ -87,6 +87,7 @@ export function DashboardShell({
       projectType: values.projectType,
       releaseDate: toISODate(values.releaseDate),
       assignments: values.assignments,
+      tasks: values.tasks,
     });
     setProjects((prev) => [...prev, project]);
     setTasks((prev) => [...prev, ...newTasks]);
