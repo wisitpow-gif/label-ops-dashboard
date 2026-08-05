@@ -29,8 +29,8 @@ import { formatShort, startOfToday, toISODate } from "@/lib/dates";
 import { UNASSIGNED, initialsOf, taskDeadline } from "@/lib/mock-data";
 import { TEAM_ROLES } from "@/lib/team";
 import { useTeam } from "@/components/team/team-provider";
-import type { Project, Task } from "@/lib/types";
-import { StatusBadge } from "./status-badge";
+import type { Project, Task, TaskStatus } from "@/lib/types";
+import { StatusSelect } from "./task-controls";
 
 // Columns represent ROLES (departments); the Unassigned bucket sits last so
 // the actionable, owned work reads first.
@@ -168,6 +168,7 @@ function TaskCard({
   onDragStart,
   onDragEnd,
   onPersonChange,
+  onStatusChange,
   onEdit,
   compact = false,
   dimmed = false,
@@ -178,6 +179,8 @@ function TaskCard({
   onDragStart: (e: React.DragEvent, cardEl: HTMLElement | null) => void;
   onDragEnd: () => void;
   onPersonChange: (person: string) => void;
+  /** Change the task status inline (persists via the board's onTaskUpdate). */
+  onStatusChange: (status: TaskStatus) => void;
   /** Open the edit-task modal for this task. */
   onEdit: () => void;
   /** When grouped under a project header, drop the project block and lead with the task. */
@@ -263,7 +266,7 @@ function TaskCard({
 
       {/* Deadline + status */}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <StatusBadge status={task.status} />
+        <StatusSelect value={task.status} onChange={onStatusChange} />
         <span
           className={cn(
             "flex items-center gap-1 text-sm font-semibold tabular-nums",
@@ -419,6 +422,7 @@ export function KanbanBoard({
         }}
         onDragEnd={() => setDraggingId(null)}
         onPersonChange={(person) => onTaskUpdate(task.id, { person })}
+        onStatusChange={(status) => onTaskUpdate(task.id, { status })}
         onEdit={() => onEditTask(task)}
       />
     );
