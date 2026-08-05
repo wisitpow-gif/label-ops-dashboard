@@ -43,6 +43,7 @@ import {
 } from "@/app/actions";
 import { UserMenu } from "@/components/auth/user-menu";
 import { CalendarView } from "./calendar-view";
+import { EditTaskDialog, type EditTaskPatch } from "./edit-task-dialog";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
 import {
@@ -75,6 +76,7 @@ export function DashboardShell({
   );
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editProject, setEditProject] = React.useState<Project | null>(null);
+  const [editTask, setEditTask] = React.useState<Task | null>(null);
 
   // Persist the new project + its template tasks, then merge into local state.
   async function handleCreate(values: ProjectFormSubmit) {
@@ -163,6 +165,35 @@ export function DashboardShell({
     },
     []
   );
+
+  // Save a task edit (name + deadline) optimistically; roll back + rethrow on
+  // failure so the modal can surface the error and stay open.
+  async function handleTaskEdit(patch: EditTaskPatch) {
+    if (!editTask) return;
+    const taskId = editTask.id;
+    let previous: Task | undefined;
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          previous = t;
+          return { ...t, name: patch.taskName, tMinusDays: patch.tMinusDays };
+        }
+        return t;
+      })
+    );
+    try {
+      await updateTask(taskId, {
+        taskName: patch.taskName,
+        tMinusDays: patch.tMinusDays,
+      });
+    } catch (err) {
+      if (previous) {
+        const restore = previous;
+        setTasks((cur) => cur.map((t) => (t.id === taskId ? restore : t)));
+      }
+      throw err;
+    }
+  }
 
   const sortedProjects = React.useMemo(
     () =>
@@ -307,6 +338,7 @@ export function DashboardShell({
               onTaskUpdate={handleTaskUpdate}
               onEditProject={setEditProject}
               onDeleteProject={handleDeleteProject}
+              onEditTask={setEditTask}
             />
           </TabsContent>
           <TabsContent value="kanban">
@@ -314,6 +346,7 @@ export function DashboardShell({
               projects={filteredProjects}
               tasks={tasks}
               onTaskUpdate={handleTaskUpdate}
+              onEditTask={setEditTask}
             />
           </TabsContent>
           <TabsContent value="gantt">
@@ -352,6 +385,20 @@ export function DashboardShell({
           values={editValues}
           onSubmit={handleUpdateProject}
         />
+
+        {/* Edit task (name + deadline) — keyed so fields re-init per task */}
+        {editTask && (
+          <EditTaskDialog
+            key={editTask.id}
+            task={editTask}
+            project={projects.find((p) => p.id === editTask.projectId) ?? null}
+            open
+            onOpenChange={(open) => {
+              if (!open) setEditTask(null);
+            }}
+            onSave={handleTaskEdit}
+          />
+        )}
       </div>
     </TooltipProvider>
   );

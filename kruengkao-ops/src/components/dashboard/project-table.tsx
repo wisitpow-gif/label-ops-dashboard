@@ -79,11 +79,13 @@ function SubTaskRow({
   project,
   allTasks,
   onTaskUpdate,
+  onEditTask,
 }: {
   task: Task;
   project: Project;
   allTasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+  onEditTask: (task: Task) => void;
 }) {
   const deadline = taskDeadline(task, project);
   const overdue = deadline < startOfToday() && task.status !== "Done";
@@ -95,7 +97,13 @@ function SubTaskRow({
     <div className="space-y-1 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 text-sm">
-          <span className="truncate">{task.name}</span>
+          <button
+            type="button"
+            onClick={() => onEditTask(task)}
+            className="truncate text-left hover:underline"
+          >
+            {task.name}
+          </button>
           {blocker && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -140,12 +148,14 @@ function GroupCard({
   project,
   allTasks,
   onTaskUpdate,
+  onEditTask,
 }: {
   title: TaskGroup;
   groupTasks: Task[];
   project: Project;
   allTasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+  onEditTask: (task: Task) => void;
 }) {
   return (
     <div className="h-fit overflow-hidden rounded-lg border bg-background">
@@ -161,6 +171,7 @@ function GroupCard({
             project={project}
             allTasks={allTasks}
             onTaskUpdate={onTaskUpdate}
+            onEditTask={onEditTask}
           />
         ))}
       </div>
@@ -173,10 +184,12 @@ function SubTaskPanel({
   project,
   tasks,
   onTaskUpdate,
+  onEditTask,
 }: {
   project: Project;
   tasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+  onEditTask: (task: Task) => void;
 }) {
   // Split the tasks into the two categories up front (no shared loop) so the
   // left/right column structure is explicit and guaranteed.
@@ -194,6 +207,7 @@ function SubTaskPanel({
             project={project}
             allTasks={tasks}
             onTaskUpdate={onTaskUpdate}
+            onEditTask={onEditTask}
           />
         </div>
 
@@ -205,6 +219,7 @@ function SubTaskPanel({
             project={project}
             allTasks={tasks}
             onTaskUpdate={onTaskUpdate}
+            onEditTask={onEditTask}
           />
         </div>
       </div>
@@ -241,6 +256,7 @@ export function ProjectTable({
   onTaskUpdate,
   onEditProject,
   onDeleteProject,
+  onEditTask,
 }: {
   projects: Project[];
   tasks: Task[];
@@ -248,6 +264,7 @@ export function ProjectTable({
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
+  onEditTask: (task: Task) => void;
 }) {
   const [expanded, setExpanded] = React.useState<Set<string>>(
     () => new Set(["1"])
@@ -486,6 +503,7 @@ export function ProjectTable({
                         project={project}
                         tasks={projectTasks}
                         onTaskUpdate={onTaskUpdate}
+                        onEditTask={onEditTask}
                       />
                     </TableCell>
                   </TableRow>

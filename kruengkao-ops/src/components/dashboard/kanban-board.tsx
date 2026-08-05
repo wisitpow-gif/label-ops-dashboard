@@ -168,6 +168,7 @@ function TaskCard({
   onDragStart,
   onDragEnd,
   onPersonChange,
+  onEdit,
   compact = false,
   dimmed = false,
 }: {
@@ -177,6 +178,8 @@ function TaskCard({
   onDragStart: (e: React.DragEvent, cardEl: HTMLElement | null) => void;
   onDragEnd: () => void;
   onPersonChange: (person: string) => void;
+  /** Open the edit-task modal for this task. */
+  onEdit: () => void;
   /** When grouped under a project header, drop the project block and lead with the task. */
   compact?: boolean;
   /** Archived look for Done tasks parked in the Outbox columns. */
@@ -214,9 +217,13 @@ function TaskCard({
       {compact ? (
         /* Task-focused: the project is shown in the group header above */
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 text-sm font-medium leading-snug">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="min-w-0 flex-1 text-left text-sm font-medium leading-snug hover:underline"
+          >
             {task.name}
-          </div>
+          </button>
           {dragHandle}
         </div>
       ) : (
@@ -244,9 +251,13 @@ function TaskCard({
             {dragHandle}
           </div>
           {/* Task name */}
-          <div className="mt-2 border-t pt-2 text-sm leading-snug">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="mt-2 block w-full border-t pt-2 text-left text-sm leading-snug hover:underline"
+          >
             {task.name}
-          </div>
+          </button>
         </>
       )}
 
@@ -280,10 +291,12 @@ export function KanbanBoard({
   projects,
   tasks,
   onTaskUpdate,
+  onEditTask,
 }: {
   projects: Project[];
   tasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+  onEditTask: (task: Task) => void;
 }) {
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const [overColumn, setOverColumn] = React.useState<string | null>(null);
@@ -406,6 +419,7 @@ export function KanbanBoard({
         }}
         onDragEnd={() => setDraggingId(null)}
         onPersonChange={(person) => onTaskUpdate(task.id, { person })}
+        onEdit={() => onEditTask(task)}
       />
     );
   };

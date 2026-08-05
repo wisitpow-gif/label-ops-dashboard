@@ -162,6 +162,7 @@ export interface UpdateTaskInput {
   person?: string; // maps to assigned_to ("" => null/unassigned)
   taskName?: string;
   dueDate?: string | null; // "" / null => clear
+  tMinusDays?: number; // deadline offset: deadline = release_date - this
 }
 
 /** Persist a single task's status / assignment / detail changes.
@@ -201,12 +202,13 @@ export async function updateTask(
     }
   }
 
-  const payload: Record<string, string | null> = {};
+  const payload: Record<string, string | number | null> = {};
   if (patch.status !== undefined) payload.status = patch.status;
   if (patch.role !== undefined) payload.role = patch.role;
   if (patch.person !== undefined) payload.assigned_to = patch.person || null;
   if (patch.taskName !== undefined) payload.task_name = patch.taskName;
   if (patch.dueDate !== undefined) payload.due_date = patch.dueDate || null;
+  if (patch.tMinusDays !== undefined) payload.t_minus_days = patch.tMinusDays;
 
   if (Object.keys(payload).length === 0) return;
 
