@@ -14,6 +14,8 @@ export interface TeamMember {
   id: string;
   name: string;
   role: string;
+  /** Optional contact email (groundwork for auth-linked personal views). */
+  email?: string;
 }
 
 /** A prerequisite edge: `taskId` is gated by `dependsOnTaskId` (hard gate). */

@@ -374,11 +374,25 @@ export async function deleteTaskTemplate(id: string): Promise<void> {
 // Team members (Settings → Team) — DB-backed Role → Person roster
 // ---------------------------------------------------------------------------
 
-const TEAM_MEMBER_COLS = "id, name, role";
+const TEAM_MEMBER_COLS = "id, name, role, email";
+
+// Lenient email check; email is optional so "" clears it.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Normalize + validate the optional email; returns null when blank. */
+function normalizeEmail(email?: string): string | null {
+  const trimmed = (email ?? "").trim();
+  if (!trimmed) return null;
+  if (!EMAIL_RE.test(trimmed)) {
+    throw new Error("อีเมลไม่ถูกต้อง");
+  }
+  return trimmed.toLowerCase();
+}
 
 export interface TeamMemberInput {
   name: string;
   role: string;
+  email?: string;
 }
 
 export async function createTeamMember(
@@ -387,7 +401,11 @@ export async function createTeamMember(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("team_members")
-    .insert({ name: input.name.trim(), role: input.role })
+    .insert({
+      name: input.name.trim(),
+      role: input.role,
+      email: normalizeEmail(input.email),
+    })
     .select(TEAM_MEMBER_COLS)
     .single();
   if (error) throw new Error(error.message);
@@ -401,7 +419,11 @@ export async function updateTeamMember(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("team_members")
-    .update({ name: input.name.trim(), role: input.role })
+    .update({
+      name: input.name.trim(),
+      role: input.role,
+      email: normalizeEmail(input.email),
+    })
     .eq("id", input.id)
     .select(TEAM_MEMBER_COLS)
     .single();

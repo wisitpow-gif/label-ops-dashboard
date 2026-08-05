@@ -143,8 +143,14 @@ export interface TeamMemberRow {
   id: string;
   name: string;
   role: string;
+  email: string | null;
 }
 
 export function mapTeamMember(row: TeamMemberRow): TeamMember {
-  return { id: row.id, name: row.name, role: row.role };
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    email: row.email ?? undefined,
+  };
 }

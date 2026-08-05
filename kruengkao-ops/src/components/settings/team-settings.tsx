@@ -68,11 +68,16 @@ function MemberDialog({
 }: {
   state: DialogState;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (values: { name: string; role: string }) => Promise<void>;
+  onSubmit: (values: {
+    name: string;
+    role: string;
+    email: string;
+  }) => Promise<void>;
 }) {
   const editing = state?.mode === "edit" ? state.member : null;
   const [name, setName] = React.useState(editing?.name ?? "");
   const [role, setRole] = React.useState(editing?.role ?? TEAM_ROLES[0]);
+  const [email, setEmail] = React.useState(editing?.email ?? "");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -85,7 +90,7 @@ function MemberDialog({
     setSaving(true);
     setError(null);
     try {
-      await onSubmit({ name: name.trim(), role });
+      await onSubmit({ name: name.trim(), role, email: email.trim() });
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
@@ -131,6 +136,21 @@ function MemberDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="member-email">
+              Email Address{" "}
+              <span className="font-normal text-muted-foreground">
+                (ไม่บังคับ)
+              </span>
+            </Label>
+            <Input
+              id="member-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@kruengkao.com"
+            />
+          </div>
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
@@ -165,7 +185,11 @@ export function TeamSettings({
 
   const groups = React.useMemo(() => toRoleGroups(members), [members]);
 
-  async function handleSubmit(values: { name: string; role: string }) {
+  async function handleSubmit(values: {
+    name: string;
+    role: string;
+    email: string;
+  }) {
     if (dialog?.mode === "edit") {
       const updated = await updateTeamMember({
         id: dialog.member.id,
@@ -273,12 +297,19 @@ export function TeamSettings({
                       key={member.id}
                       className="flex items-center gap-3 px-4 py-2.5"
                     >
-                      <Avatar className="size-7">
+                      <Avatar className="size-7 shrink-0">
                         <AvatarFallback className="text-xs">
                           {initialsOf(personName)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm">{personName}</span>
+                      <div className="min-w-0">
+                        <div className="text-sm">{personName}</div>
+                        {member.email && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {member.email}
+                          </div>
+                        )}
+                      </div>
                       <div className="ml-auto flex items-center gap-1">
                         <Button
                           variant="ghost"

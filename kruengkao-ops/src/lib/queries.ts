@@ -170,7 +170,7 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("team_members")
-    .select("id, name, role")
+    .select("id, name, role, email")
     .order("role")
     .order("name");
   if (error) throw new Error(error.message);
