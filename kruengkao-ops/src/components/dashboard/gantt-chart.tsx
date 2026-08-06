@@ -38,10 +38,17 @@ const GROUP_DOTS: Record<string, string> = {
 };
 
 const LABEL_W = "w-64"; // keep the header spacer and every row in sync
+const LABEL_W_PX = 256; // w-64 = 16rem, used for the auto-scroll math
 
 interface Range {
   start: Date;
   totalDays: number;
+}
+
+interface Row {
+  project: Project;
+  tasks: Task[];
+  inactive: boolean;
 }
 
 function pct(range: Range, date: Date): number {
@@ -49,11 +56,7 @@ function pct(range: Range, date: Date): number {
 }
 
 /** Faint vertical line at each month boundary, drawn behind a row's bars. */
-function MonthGrid({
-  months,
-}: {
-  months: { label: string; left: number }[];
-}) {
+function MonthGrid({ months }: { months: { label: string; left: number }[] }) {
   return (
     <>
       {months.map((m, i) =>
@@ -66,6 +69,18 @@ function MonthGrid({
         )
       )}
     </>
+  );
+}
+
+/** Prominent dashed "today" line inside a single row (grid < today < bars). */
+function TodayLine({ range, today }: { range: Range; today: Date | null }) {
+  if (today === null) return null;
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 z-[1] border-l-2 border-dashed border-red-500"
+      style={{ left: `${pct(range, today)}%` }}
+    />
   );
 }
 
@@ -101,7 +116,7 @@ function TaskBar({
           onClick={onEdit}
           aria-label={`แก้ไข ${task.name}`}
           className={cn(
-            "absolute top-1/2 h-5 -translate-y-1/2 cursor-pointer rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+            "absolute top-1/2 z-10 h-5 -translate-y-1/2 cursor-pointer rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
             BAR_STYLES[task.status],
             overdue && "ring-2 ring-red-500"
           )}
@@ -173,20 +188,12 @@ export function GanttChart({
     getServerToday
   );
 
-  const [collapsed, setCollapsed] = React.useState<Set<string>>(
-    () => new Set()
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const scrolledRef = React.useRef(false);
+  // Explicit per-project overrides layered over the smart default collapse.
+  const [overrides, setOverrides] = React.useState<Map<string, boolean>>(
+    () => new Map()
   );
-  const toggle = (id: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  const allCollapsed =
-    projects.length > 0 && projects.every((p) => collapsed.has(p.id));
-  const toggleAll = () =>
-    setCollapsed(allCollapsed ? new Set() : new Set(projects.map((p) => p.id)));
 
   const range: Range | null = React.useMemo(() => {
     if (projects.length === 0) return null;
@@ -197,14 +204,53 @@ export function GanttChart({
       tasks.filter((t) => t.projectId === p.id).map((t) => taskDeadline(t, p))
     );
     const releases = projects.map((p) => parseDate(p.releaseDate));
-    // Include releases so the range is valid even for task-less projects, and
-    // ends so edited deadlines past the release date still fit.
-    const minMs = Math.min(...[...starts, ...releases].map((d) => d.getTime()));
-    const maxMs = Math.max(...[...ends, ...releases].map((d) => d.getTime()));
+    const dayMs = today ? [today.getTime()] : [];
+    const minMs = Math.min(
+      ...[...starts, ...releases].map((d) => d.getTime()),
+      ...dayMs
+    );
+    const maxMs = Math.max(
+      ...[...ends, ...releases].map((d) => d.getTime()),
+      ...dayMs
+    );
     const min = addDays(new Date(minMs), -4);
     const max = addDays(new Date(maxMs), 8);
     return { start: min, totalDays: Math.max(diffDays(min, max), 1) };
-  }, [projects, tasks]);
+  }, [projects, tasks, today]);
+
+  // Smart order: active projects first (nearest upcoming release on top), then
+  // inactive (completed OR release passed) newest-first. Inactive collapse by
+  // default. During SSR (today = null) nothing is inactive, so it matches.
+  const rows: Row[] = React.useMemo(() => {
+    const isInactive = (p: Project, pt: Task[]) => {
+      if (today === null) return false;
+      const done = pt.length > 0 && pt.every((t) => t.status === "Done");
+      return done || parseDate(p.releaseDate) < today;
+    };
+    const all = projects.map((p) => {
+      const pt = tasks.filter((t) => t.projectId === p.id);
+      return { project: p, tasks: pt, inactive: isInactive(p, pt) };
+    });
+    const active = all
+      .filter((r) => !r.inactive)
+      .sort((a, b) => a.project.releaseDate.localeCompare(b.project.releaseDate));
+    const inactive = all
+      .filter((r) => r.inactive)
+      .sort((a, b) => b.project.releaseDate.localeCompare(a.project.releaseDate));
+    return [...active, ...inactive];
+  }, [projects, tasks, today]);
+
+  // Auto-scroll so "today" sits at the left-center of the timeline on load.
+  React.useEffect(() => {
+    if (scrolledRef.current || today === null || !range || !scrollRef.current)
+      return;
+    const el = scrollRef.current;
+    const timelineW = el.scrollWidth - LABEL_W_PX;
+    if (timelineW <= 0) return;
+    const todayX = LABEL_W_PX + (pct(range, today) / 100) * timelineW;
+    el.scrollLeft = Math.max(0, todayX - el.clientWidth * 0.35);
+    scrolledRef.current = true;
+  }, [today, range]);
 
   if (!range) {
     return (
@@ -215,23 +261,28 @@ export function GanttChart({
   }
 
   const months = monthSegments(range);
-  const taskCount = tasks.filter((t) =>
-    projects.some((p) => p.id === t.projectId)
-  ).length;
+  const collapsedFor = (r: Row) =>
+    overrides.has(r.project.id)
+      ? (overrides.get(r.project.id) as boolean)
+      : r.inactive;
+  const allCollapsed = rows.length > 0 && rows.every((r) => collapsedFor(r));
+  const toggle = (r: Row) =>
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(r.project.id, !collapsedFor(r));
+      return next;
+    });
+  const toggleAll = () =>
+    setOverrides(new Map(rows.map((r) => [r.project.id, !allCollapsed])));
 
   return (
     <div className="space-y-3">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm text-muted-foreground tabular-nums">
-          {projects.length} โปรเจกต์ · {taskCount} งาน
+          {projects.length} โปรเจกต์
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleAll}
-          disabled={projects.length === 0}
-        >
+        <Button variant="outline" size="sm" onClick={toggleAll}>
           {allCollapsed ? (
             <ChevronsUpDown data-icon="inline-start" />
           ) : (
@@ -241,14 +292,14 @@ export function GanttChart({
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div ref={scrollRef} className="overflow-x-auto rounded-xl border">
         <div className="min-w-[64rem]">
-          {/* Month header */}
+          {/* Month header (with the "Today" label) */}
           <div className="flex border-b bg-muted/50">
             <div
               className={cn(
                 LABEL_W,
-                "shrink-0 border-r px-3 py-2 text-sm font-medium"
+                "sticky left-0 z-30 shrink-0 border-r bg-muted px-3 py-2 text-sm font-medium"
               )}
             >
               Project / Task
@@ -263,31 +314,39 @@ export function GanttChart({
                   {m.label}
                 </div>
               ))}
+              {today !== null && (
+                <div
+                  className="pointer-events-none absolute top-0 z-10"
+                  style={{ left: `${pct(range, today)}%` }}
+                >
+                  <span className="-translate-x-1/2 rounded-b bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    Today
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {projects.map((project) => {
-            const projectTasks = tasks.filter(
-              (t) => t.projectId === project.id
-            );
+          {rows.map((row) => {
+            const { project, tasks: projectTasks } = row;
             const releasePct = pct(range, parseDate(project.releaseDate));
-            const isCollapsed = collapsed.has(project.id);
+            const isCollapsed = collapsedFor(row);
             const doneCount = projectTasks.filter(
               (t) => t.status === "Done"
             ).length;
             return (
               <div key={project.id} className="border-b last:border-b-0">
-                {/* Project header row with release-date marker */}
+                {/* Project header row */}
                 <div className="flex bg-muted/30">
                   <div
                     className={cn(
                       LABEL_W,
-                      "flex shrink-0 items-start gap-1.5 border-r px-2 py-2"
+                      "sticky left-0 z-20 flex shrink-0 items-start gap-1.5 border-r bg-muted px-2 py-2"
                     )}
                   >
                     <button
                       type="button"
-                      onClick={() => toggle(project.id)}
+                      onClick={() => toggle(row)}
                       aria-label={isCollapsed ? "กางงาน" : "ย่องาน"}
                       aria-expanded={!isCollapsed}
                       className="mt-0.5 rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
@@ -315,10 +374,11 @@ export function GanttChart({
                   </div>
                   <div className="relative flex-1">
                     <MonthGrid months={months} />
+                    <TodayLine range={range} today={today} />
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          className="absolute top-1/2 z-10 size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 cursor-pointer rounded-[2px] bg-foreground"
+                          className="absolute top-1/2 z-[2] size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 cursor-pointer rounded-[2px] bg-foreground"
                           style={{ left: `${releasePct}%` }}
                         />
                       </TooltipTrigger>
@@ -346,7 +406,7 @@ export function GanttChart({
                         <div
                           className={cn(
                             LABEL_W,
-                            "flex shrink-0 items-center gap-2 border-r py-1.5 pr-2 pl-8"
+                            "sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r bg-background py-1.5 pr-2 pl-8"
                           )}
                         >
                           <span
@@ -389,12 +449,7 @@ export function GanttChart({
                             className="absolute inset-y-0 w-px bg-foreground/10"
                             style={{ left: `${releasePct}%` }}
                           />
-                          {today !== null && (
-                            <div
-                              className="absolute inset-y-0 z-10 w-px bg-red-500/60"
-                              style={{ left: `${pct(range, today)}%` }}
-                            />
-                          )}
+                          <TodayLine range={range} today={today} />
                           <TaskBar
                             task={task}
                             project={project}
@@ -431,7 +486,8 @@ export function GanttChart({
               Release Date
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-3 w-px bg-red-500/60" /> วันนี้
+              <span className="h-3 border-l-2 border-dashed border-red-500" />{" "}
+              Today
             </span>
           </div>
         </div>
