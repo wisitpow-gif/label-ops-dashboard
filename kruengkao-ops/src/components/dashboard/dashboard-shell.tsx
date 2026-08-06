@@ -357,7 +357,11 @@ export function DashboardShell({
             />
           </TabsContent>
           <TabsContent value="gantt">
-            <GanttChart projects={filteredProjects} tasks={tasks} />
+            <GanttChart
+              projects={filteredProjects}
+              tasks={tasks}
+              onEditTask={setEditTask}
+            />
           </TabsContent>
           <TabsContent value="calendar">
             <CalendarView
