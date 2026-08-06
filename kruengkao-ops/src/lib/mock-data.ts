@@ -186,13 +186,16 @@ export function taskById(id: string): Task | undefined {
   return TASKS.find((t) => t.id === id);
 }
 
-/** Deadline = release date minus T-minus offset (calendar days for now) */
+/** Task end (deadline): the stored end_date if set, else the workback
+ *  (release date minus the T-minus offset). */
 export function taskDeadline(task: Task, project: Project): Date {
+  if (task.endDate) return parseDate(task.endDate);
   return addDays(parseDate(project.releaseDate), -task.tMinusDays);
 }
 
-/** Gantt bar start = deadline minus working window */
+/** Task start: the stored start_date if set, else end minus the duration. */
 export function taskStart(task: Task, project: Project): Date {
+  if (task.startDate) return parseDate(task.startDate);
   return addDays(taskDeadline(task, project), -task.durationDays);
 }
 

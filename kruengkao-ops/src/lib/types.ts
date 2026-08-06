@@ -86,6 +86,9 @@ export interface Task {
   person: string;
   /** Optional direct due date (used by Internal tasks; releases derive from T-minus) */
   dueDate?: string;
+  /** Stored timeline range (yyyy-mm-dd). When set, these win over the workback. */
+  startDate?: string;
+  endDate?: string;
   /** Upstream dependency — when that task is late, this one shows as Blocked */
   blockedBy?: string;
 }

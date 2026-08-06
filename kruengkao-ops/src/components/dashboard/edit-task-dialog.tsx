@@ -22,20 +22,57 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { diffDays, formatFull, parseDate } from "@/lib/dates";
-import { taskDeadline } from "@/lib/mock-data";
+import { formatFull, parseDate, toISODate } from "@/lib/dates";
+import { taskDeadline, taskStart } from "@/lib/mock-data";
 import type { Project, Task } from "@/lib/types";
 
 export interface EditTaskPatch {
   taskName: string;
-  /** deadline = release_date - tMinusDays (workback offset) */
-  tMinusDays: number;
+  startDate: string; // yyyy-mm-dd
+  endDate: string; // yyyy-mm-dd
 }
 
-/**
- * Reusable modal to edit a task's name + deadline. The deadline is stored as a
- * workback offset (t_minus_days) so every existing view reflects it directly.
- */
+/** Labeled date picker used for both Start and End. */
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: Date;
+  onChange: (d: Date) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(
+              "w-full justify-start font-normal",
+              !value && "text-muted-foreground"
+            )}
+          >
+            <CalendarDays data-icon="inline-start" />
+            {value ? formatFull(value) : "เลือกวันที่"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={value}
+            onSelect={(d) => d && onChange(d)}
+            autoFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+/** Reusable modal to edit a task's name + start/end date range. */
 export function EditTaskDialog({
   task,
   project,
@@ -49,11 +86,20 @@ export function EditTaskDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (patch: EditTaskPatch) => Promise<void>;
 }) {
-  const hasReleaseDate = !!project?.releaseDate;
+  const initialEnd = project
+    ? taskDeadline(task, project)
+    : task.endDate
+      ? parseDate(task.endDate)
+      : new Date();
+  const initialStart = project
+    ? taskStart(task, project)
+    : task.startDate
+      ? parseDate(task.startDate)
+      : initialEnd;
+
   const [name, setName] = React.useState(task.name);
-  const [deadline, setDeadline] = React.useState<Date | undefined>(
-    hasReleaseDate ? taskDeadline(task, project!) : undefined
-  );
+  const [start, setStart] = React.useState<Date | undefined>(initialStart);
+  const [end, setEnd] = React.useState<Date | undefined>(initialEnd);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -63,17 +109,22 @@ export function EditTaskDialog({
       setError("กรอกชื่องาน");
       return;
     }
-    if (!deadline) {
-      setError("เลือกวันกำหนดส่ง");
+    if (!start || !end) {
+      setError("เลือกวันเริ่มและวันสิ้นสุด");
+      return;
+    }
+    if (toISODate(end) < toISODate(start)) {
+      setError("วันสิ้นสุดต้องไม่มาก่อนวันเริ่ม");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const tMinusDays = hasReleaseDate
-        ? diffDays(deadline, parseDate(project!.releaseDate))
-        : task.tMinusDays;
-      await onSave({ taskName: name.trim(), tMinusDays });
+      await onSave({
+        taskName: name.trim(),
+        startDate: toISODate(start),
+        endDate: toISODate(end),
+      });
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
@@ -82,16 +133,11 @@ export function EditTaskDialog({
     }
   }
 
-  const tMinus =
-    hasReleaseDate && deadline
-      ? diffDays(deadline, parseDate(project!.releaseDate))
-      : null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-md"
-        // Opened from a card/row that may unmount — don't restore focus to it.
+        // Opened from a card/row/calendar block that may unmount — keep focus.
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -99,7 +145,7 @@ export function EditTaskDialog({
           <DialogDescription>
             {project
               ? `${project.songName} · ${project.artistName}`
-              : "แก้ไขชื่องานและวันกำหนดส่ง"}
+              : "แก้ไขชื่องานและช่วงเวลา"}
           </DialogDescription>
         </DialogHeader>
 
@@ -115,38 +161,9 @@ export function EditTaskDialog({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Deadline</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!hasReleaseDate}
-                  className={cn(
-                    "w-full justify-start font-normal",
-                    !deadline && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarDays data-icon="inline-start" />
-                  {deadline ? formatFull(deadline) : "เลือกวันกำหนดส่ง"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={deadline}
-                  onSelect={setDeadline}
-                  autoFocus
-                />
-              </PopoverContent>
-            </Popover>
-            {hasReleaseDate && tMinus !== null && (
-              <p className="text-xs text-muted-foreground">
-                ปล่อยเพลง {formatFull(parseDate(project!.releaseDate))} · T-
-                {tMinus}
-              </p>
-            )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <DateField label="Start Date" value={start} onChange={setStart} />
+            <DateField label="End Date" value={end} onChange={setEnd} />
           </div>
 
           {error && (

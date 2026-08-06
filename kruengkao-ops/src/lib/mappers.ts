@@ -35,6 +35,8 @@ export interface TaskRow {
   t_minus_days: number;
   duration_days: number;
   due_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
   blocked_by: string | null;
 }
 
@@ -121,6 +123,8 @@ export function mapTask(row: TaskRow): Task {
     role: row.role,
     person: row.assigned_to ?? "",
     dueDate: row.due_date ?? undefined,
+    startDate: row.start_date ?? undefined,
+    endDate: row.end_date ?? undefined,
     blockedBy: row.blocked_by ?? undefined,
   };
 }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { addDays, parseDate, toISODate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import {
   mapProject,
@@ -32,7 +33,7 @@ const ASSET_COLS =
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const TASK_COLS =
-  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, blocked_by";
+  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, start_date, end_date, blocked_by";
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 
@@ -125,20 +126,28 @@ export async function createProject(
     }));
   }
 
-  const taskRows = specs.map((s) => ({
-    id: crypto.randomUUID(),
-    project_id: projectRow.id,
-    task_key: s.taskKey,
-    category: s.category,
-    task_name: s.taskName,
-    role: s.role,
-    assigned_to: s.person,
-    status: "Not Start",
-    t_minus_days: s.tMinusDays,
-    duration_days: s.durationDays,
-    blocked_by: null,
-    sort_order: s.sortOrder,
-  }));
+  // Workback → stored range: end = release - t_minus, start = end - duration.
+  const releaseDate = parseDate(input.releaseDate);
+  const taskRows = specs.map((s) => {
+    const end = addDays(releaseDate, -s.tMinusDays);
+    const start = addDays(end, -s.durationDays);
+    return {
+      id: crypto.randomUUID(),
+      project_id: projectRow.id,
+      task_key: s.taskKey,
+      category: s.category,
+      task_name: s.taskName,
+      role: s.role,
+      assigned_to: s.person,
+      status: "Not Start",
+      t_minus_days: s.tMinusDays,
+      duration_days: s.durationDays,
+      start_date: toISODate(start),
+      end_date: toISODate(end),
+      blocked_by: null,
+      sort_order: s.sortOrder,
+    };
+  });
 
   let insertedTasks: TaskRow[] = [];
   if (taskRows.length > 0) {
@@ -203,6 +212,8 @@ export interface UpdateTaskInput {
   taskName?: string;
   dueDate?: string | null; // "" / null => clear
   tMinusDays?: number; // deadline offset: deadline = release_date - this
+  startDate?: string | null; // yyyy-mm-dd ("" / null => clear)
+  endDate?: string | null;
 }
 
 /** Persist a single task's status / assignment / detail changes.
@@ -249,6 +260,8 @@ export async function updateTask(
   if (patch.taskName !== undefined) payload.task_name = patch.taskName;
   if (patch.dueDate !== undefined) payload.due_date = patch.dueDate || null;
   if (patch.tMinusDays !== undefined) payload.t_minus_days = patch.tMinusDays;
+  if (patch.startDate !== undefined) payload.start_date = patch.startDate || null;
+  if (patch.endDate !== undefined) payload.end_date = patch.endDate || null;
 
   if (Object.keys(payload).length === 0) return;
 

@@ -177,7 +177,12 @@ export function DashboardShell({
       prev.map((t) => {
         if (t.id === taskId) {
           previous = t;
-          return { ...t, name: patch.taskName, tMinusDays: patch.tMinusDays };
+          return {
+            ...t,
+            name: patch.taskName,
+            startDate: patch.startDate,
+            endDate: patch.endDate,
+          };
         }
         return t;
       })
@@ -185,7 +190,8 @@ export function DashboardShell({
     try {
       await updateTask(taskId, {
         taskName: patch.taskName,
-        tMinusDays: patch.tMinusDays,
+        startDate: patch.startDate,
+        endDate: patch.endDate,
       });
     } catch (err) {
       if (previous) {
@@ -354,7 +360,11 @@ export function DashboardShell({
             <GanttChart projects={filteredProjects} tasks={tasks} />
           </TabsContent>
           <TabsContent value="calendar">
-            <CalendarView projects={filteredProjects} tasks={tasks} />
+            <CalendarView
+              projects={filteredProjects}
+              tasks={tasks}
+              onEditTask={setEditTask}
+            />
           </TabsContent>
         </Tabs>
 

@@ -36,7 +36,7 @@ export async function getCurrentUserEmail(): Promise<string | null> {
 const PROJECT_COLS =
   "id, song_title, artist, label, project_type, work_type, release_date, target_date";
 const TASK_COLS =
-  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, blocked_by";
+  "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, start_date, end_date, blocked_by";
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 const ASSET_COLS =
