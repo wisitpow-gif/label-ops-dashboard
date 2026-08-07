@@ -177,14 +177,15 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
   return (data as TeamMemberRow[]).map(mapTeamMember);
 }
 
-/** All configurable task templates, ordered by type then sort order. */
+/** All configurable task templates, ordered by type then chronological
+ *  workback (t_minus descending: T-90 before T-60 before T-0). */
 export async function getTaskTemplates(): Promise<TaskTemplate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("task_templates")
     .select(TEMPLATE_COLS)
     .order("project_type")
-    .order("sort_order");
+    .order("t_minus_days", { ascending: false });
 
   if (error) throw new Error(error.message);
   return (data as TaskTemplateRow[]).map(mapTaskTemplate);

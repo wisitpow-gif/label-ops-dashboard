@@ -75,11 +75,12 @@ export function TemplatesManager({
   const [syncOpen, setSyncOpen] = React.useState(false);
   const [syncing, setSyncing] = React.useState(false);
 
+  // Chronological workback order: T-90 before T-60 before T-0.
   const rows = React.useMemo(
     () =>
       templates
         .filter((t) => t.projectType === selectedType)
-        .sort((a, b) => a.sortOrder - b.sortOrder),
+        .toSorted((a, b) => b.tMinusDays - a.tMinusDays),
     [templates, selectedType]
   );
 

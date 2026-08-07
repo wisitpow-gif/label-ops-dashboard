@@ -153,12 +153,11 @@ export function ProjectFormDialog({
   const resolvedAssignee = (role: string) =>
     assignments[role] ?? membersOfRole(role)[0] ?? "";
 
-  // Build the preview timeline from the selected type's templates + assignments.
+  // Build the preview timeline from the selected type's templates + assignments,
+  // in strict chronological order (earliest deadline first).
   const computeDraftTasks = (formValues: NewProjectInput): DraftTask[] =>
     taskTemplates
       .filter((t) => t.projectType === formValues.projectType)
-      .slice()
-      .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((t) => ({
         key: t.id,
         taskName: t.taskName,
@@ -170,7 +169,8 @@ export function ProjectFormDialog({
         taskKey: t.taskKey || null,
         sortOrder: t.sortOrder,
         deadline: addDays(formValues.releaseDate, -t.tMinusDays),
-      }));
+      }))
+      .toSorted((a, b) => a.deadline.getTime() - b.deadline.getTime());
 
   const updateDraft = (key: string, patch: Partial<DraftTask>) =>
     setDraftTasks((prev) =>

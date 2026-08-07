@@ -191,10 +191,16 @@ function SubTaskPanel({
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onEditTask: (task: Task) => void;
 }) {
-  // Split the tasks into the two categories up front (no shared loop) so the
-  // left/right column structure is explicit and guaranteed.
-  const digitalTasks = tasks.filter((t) => t.group === "Digital Distribution Pack");
-  const teaserTasks = tasks.filter((t) => t.group === "TEASER & MV");
+  // Split into the two categories, each sorted chronologically by deadline
+  // (earliest end_date first).
+  const byDeadline = (a: Task, b: Task) =>
+    taskDeadline(a, project).getTime() - taskDeadline(b, project).getTime();
+  const digitalTasks = tasks
+    .filter((t) => t.group === "Digital Distribution Pack")
+    .toSorted(byDeadline);
+  const teaserTasks = tasks
+    .filter((t) => t.group === "TEASER & MV")
+    .toSorted(byDeadline);
 
   return (
     <div className="bg-muted/40 p-4">
