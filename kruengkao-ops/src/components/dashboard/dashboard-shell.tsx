@@ -7,6 +7,7 @@ import {
   ChartGantt,
   ClipboardList,
   Disc3,
+  LayoutDashboard,
   Library,
   ListFilter,
   Plus,
@@ -46,6 +47,7 @@ import { CalendarView } from "./calendar-view";
 import { EditTaskDialog, type EditTaskPatch } from "./edit-task-dialog";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
+import { OverviewDashboard } from "./overview-dashboard";
 import {
   ProjectFormDialog,
   type NewProjectInput,
@@ -59,11 +61,14 @@ export function DashboardShell({
   initialTasks,
   userEmail,
   taskTemplates = [],
+  currentPerson = null,
 }: {
   initialProjects: Project[];
   initialTasks: Task[];
   userEmail?: string | null;
   taskTemplates?: TaskTemplate[];
+  /** Team-member name matched to the signed-in user (drives "My Tasks"). */
+  currentPerson?: string | null;
 }) {
   const [projects, setProjects] = React.useState<Project[]>(initialProjects);
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
@@ -318,8 +323,12 @@ export function DashboardShell({
           </div>
         </header>
 
-        <Tabs defaultValue="table">
+        <Tabs defaultValue="overview">
           <TabsList>
+            <TabsTrigger value="overview">
+              <LayoutDashboard data-icon="inline-start" />
+              Overview
+            </TabsTrigger>
             <TabsTrigger value="table">
               <Table2 data-icon="inline-start" />
               Project View
@@ -337,6 +346,15 @@ export function DashboardShell({
               Calendar View
             </TabsTrigger>
           </TabsList>
+          <TabsContent value="overview">
+            <OverviewDashboard
+              projects={projects}
+              tasks={tasks}
+              currentPerson={currentPerson}
+              onTaskUpdate={handleTaskUpdate}
+              onEditTask={setEditTask}
+            />
+          </TabsContent>
           <TabsContent value="table">
             <ProjectTable
               projects={filteredProjects}

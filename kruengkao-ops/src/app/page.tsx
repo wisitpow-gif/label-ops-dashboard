@@ -16,6 +16,15 @@ export default async function Home() {
       getTeamMembers(),
       getTaskTemplates(),
     ]);
+
+  // Link the signed-in user to their team-member name (via email) so the
+  // "My Tasks" section can filter by assignee.
+  const normalizedEmail = userEmail?.toLowerCase() ?? null;
+  const currentPerson = normalizedEmail
+    ? (members.find((m) => m.email?.toLowerCase() === normalizedEmail)?.name ??
+      null)
+    : null;
+
   return (
     <TeamProvider groups={toRoleGroups(members)}>
       <DashboardShell
@@ -23,6 +32,7 @@ export default async function Home() {
         initialTasks={tasks}
         userEmail={userEmail}
         taskTemplates={templates}
+        currentPerson={currentPerson}
       />
     </TeamProvider>
   );
