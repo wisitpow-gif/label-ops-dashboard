@@ -275,7 +275,7 @@ function AssetCard({
 // Digital Library (per project)
 // ---------------------------------------------------------------------------
 
-export function IngestHub({
+export function DigitalLibrary({
   project,
   initialAssets,
   userEmail,

@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 
-import { IngestHub } from "@/components/ingest/ingest-hub";
+import { DigitalLibrary } from "@/components/digital-library/digital-library";
 import {
   getCurrentUserEmail,
   getProjectAssets,
   getProjectById,
 } from "@/lib/queries";
 
-export default async function IngestPage({
+export default async function DigitalLibraryPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -22,6 +22,10 @@ export default async function IngestPage({
   if (!project) notFound();
 
   return (
-    <IngestHub project={project} initialAssets={assets} userEmail={userEmail} />
+    <DigitalLibrary
+      project={project}
+      initialAssets={assets}
+      userEmail={userEmail}
+    />
   );
 }

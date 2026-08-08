@@ -7,7 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  Inbox,
+  Library,
   Link2,
   MoreHorizontal,
   Pencil,
@@ -451,15 +451,15 @@ export function ProjectTable({
                             variant="ghost"
                             size="icon"
                             className="size-7 text-muted-foreground"
-                            aria-label="Ingest Hub"
+                            aria-label="Digital Library"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Link href={`/projects/${project.id}/ingest`}>
-                              <Inbox className="size-4" />
+                            <Link href={`/projects/${project.id}/digital-library`}>
+                              <Library className="size-4" />
                             </Link>
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Ingest Hub</TooltipContent>
+                        <TooltipContent>Digital Library</TooltipContent>
                       </Tooltip>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

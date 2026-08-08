@@ -590,11 +590,11 @@ export async function syncTemplateToProjects(
 }
 
 // ---------------------------------------------------------------------------
-// DAM — project_assets (Ingest Hub)
+// DAM — project_assets (Digital Library)
 // ---------------------------------------------------------------------------
 
-function revalidateIngest(projectId: string) {
-  revalidatePath(`/projects/${projectId}/ingest`);
+function revalidateDigitalLibrary(projectId: string) {
+  revalidatePath(`/projects/${projectId}/digital-library`);
 }
 
 export interface CreateAssetInput {
@@ -624,7 +624,7 @@ export async function createProjectAsset(
   if (error || !data) {
     throw new Error(error?.message ?? "Failed to submit asset");
   }
-  revalidateIngest(input.projectId);
+  revalidateDigitalLibrary(input.projectId);
   return mapProjectAsset(data as ProjectAssetRow);
 }
 
@@ -645,7 +645,7 @@ export async function updateAssetOfficialLink(
     throw new Error(error?.message ?? "Failed to update official link");
   }
   const asset = mapProjectAsset(data as ProjectAssetRow);
-  revalidateIngest(asset.projectId);
+  revalidateDigitalLibrary(asset.projectId);
   return asset;
 }
 
@@ -666,7 +666,7 @@ export async function setAssetLocalBackup(
     throw new Error(error?.message ?? "Failed to update backup status");
   }
   const asset = mapProjectAsset(data as ProjectAssetRow);
-  revalidateIngest(asset.projectId);
+  revalidateDigitalLibrary(asset.projectId);
   return asset;
 }
 
