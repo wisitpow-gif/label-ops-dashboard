@@ -1,5 +1,4 @@
 import type {
-  AssetStatus,
   Project,
   ProjectAsset,
   ProjectType,
@@ -68,14 +67,11 @@ export interface TaskTemplateRow {
 export interface ProjectAssetRow {
   id: string;
   project_id: string;
-  provider_role: string;
-  asset_name: string;
-  status: string;
-  submitted_link: string | null;
-  vault_link: string | null;
-  submitter_note: string | null;
-  reviewer_note: string | null;
-  version: number;
+  category: string;
+  note: string | null;
+  source_link: string | null;
+  official_drive_link: string | null;
+  is_backed_up_local: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -84,14 +80,11 @@ export function mapProjectAsset(row: ProjectAssetRow): ProjectAsset {
   return {
     id: row.id,
     projectId: row.project_id,
-    providerRole: row.provider_role,
-    assetName: row.asset_name,
-    status: row.status as AssetStatus,
-    submittedLink: row.submitted_link ?? undefined,
-    vaultLink: row.vault_link ?? undefined,
-    submitterNote: row.submitter_note ?? undefined,
-    reviewerNote: row.reviewer_note ?? undefined,
-    version: row.version,
+    category: row.category,
+    note: row.note ?? "",
+    sourceLink: row.source_link ?? "",
+    officialDriveLink: row.official_drive_link ?? undefined,
+    isBackedUpLocal: row.is_backed_up_local,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

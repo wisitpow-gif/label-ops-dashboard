@@ -1,21 +1,21 @@
 import { LibraryMap } from "@/components/library/library-map";
 import {
   getCurrentUserEmail,
+  getOfficialAssets,
   getProjects,
-  getVaultedAssets,
 } from "@/lib/queries";
 
 export default async function LibraryPage() {
-  const [projects, vaultedAssets, userEmail] = await Promise.all([
+  const [projects, officialAssets, userEmail] = await Promise.all([
     getProjects(),
-    getVaultedAssets(),
+    getOfficialAssets(),
     getCurrentUserEmail(),
   ]);
 
   return (
     <LibraryMap
       projects={projects}
-      vaultedAssets={vaultedAssets}
+      officialAssets={officialAssets}
       userEmail={userEmail}
     />
   );

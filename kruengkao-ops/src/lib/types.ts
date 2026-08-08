@@ -25,22 +25,21 @@ export interface TaskDependency {
   dependsOnTaskId: string;
 }
 
-// --- DAM: Digital Asset Management ---
+// --- DAM: Digital Asset Management (Quick Drop → verify → official → backup) ---
 
-export type AssetStatus = "Pending Review" | "Revision" | "Vaulted";
-
-/** One row of project_assets (Ingest Hub → Library). */
+/** One row of project_assets — a submitted file tracked across cloud + local. */
 export interface ProjectAsset {
   id: string;
   projectId: string;
-  providerRole: string;
-  assetName: string;
-  status: AssetStatus;
-  submittedLink?: string;
-  vaultLink?: string;
-  submitterNote?: string;
-  reviewerNote?: string;
-  version: number;
+  category: string;
+  /** Short note / file name. */
+  note: string;
+  /** Team member's temporary external link (Drive/Dropbox/…). */
+  sourceLink: string;
+  /** Admin's final Official Google Drive link (empty until processed). */
+  officialDriveLink?: string;
+  /** Backed up to physical local storage (HDD/SSD). */
+  isBackedUpLocal: boolean;
   createdAt: string;
   updatedAt: string;
 }

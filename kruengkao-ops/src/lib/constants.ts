@@ -53,6 +53,16 @@ export const TEMPLATE_CATEGORIES = [
   "TEASER & MV",
 ] as const;
 
+// Asset categories for the Digital Library "Quick Drop" + grouping.
+export const ASSET_CATEGORIES = [
+  "Master Audio",
+  "Teaser",
+  "MV Export",
+  "Stems",
+  "Artwork",
+  "Other",
+] as const;
+
 // Assignable roles for a template's default owner.
 export const TEMPLATE_ROLES = [
   "Unassigned",

@@ -29,7 +29,7 @@ import type {
 } from "@/lib/types";
 
 const ASSET_COLS =
-  "id, project_id, provider_role, asset_name, status, submitted_link, vault_link, submitter_note, reviewer_note, version, created_at, updated_at";
+  "id, project_id, category, note, source_link, official_drive_link, is_backed_up_local, created_at, updated_at";
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const TASK_COLS =
@@ -599,13 +599,12 @@ function revalidateIngest(projectId: string) {
 
 export interface CreateAssetInput {
   projectId: string;
-  providerRole: string;
-  assetName: string;
-  submittedLink: string;
-  submitterNote: string;
+  category: string;
+  note: string;
+  sourceLink: string;
 }
 
-/** Creator submits a new asset — starts at "Pending Review", version 1. */
+/** Quick Drop: a team member drops an external source link + note + category. */
 export async function createProjectAsset(
   input: CreateAssetInput
 ): Promise<ProjectAsset> {
@@ -614,12 +613,10 @@ export async function createProjectAsset(
     .from("project_assets")
     .insert({
       project_id: input.projectId,
-      provider_role: input.providerRole,
-      asset_name: input.assetName,
-      submitted_link: input.submittedLink || null,
-      submitter_note: input.submitterNote || null,
-      status: "Pending Review",
-      version: 1,
+      category: input.category,
+      note: input.note || null,
+      source_link: input.sourceLink || null,
+      is_backed_up_local: false,
     })
     .select(ASSET_COLS)
     .single();
@@ -631,72 +628,42 @@ export async function createProjectAsset(
   return mapProjectAsset(data as ProjectAssetRow);
 }
 
-export interface ReviewAssetInput {
-  status: "Vaulted" | "Revision";
-  vaultLink: string;
-  reviewerNote: string;
-}
-
-/** Digital team reviews: approve (Vaulted + vault_link) or reject (Revision). */
-export async function reviewProjectAsset(
+/** Admin pastes (or clears) the final Official Google Drive link. */
+export async function updateAssetOfficialLink(
   id: string,
-  input: ReviewAssetInput
+  officialDriveLink: string
 ): Promise<ProjectAsset> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_assets")
-    .update({
-      status: input.status,
-      vault_link: input.vaultLink || null,
-      reviewer_note: input.reviewerNote || null,
-    })
+    .update({ official_drive_link: officialDriveLink.trim() || null })
     .eq("id", id)
     .select(ASSET_COLS)
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Failed to review asset");
+    throw new Error(error?.message ?? "Failed to update official link");
   }
   const asset = mapProjectAsset(data as ProjectAssetRow);
   revalidateIngest(asset.projectId);
   return asset;
 }
 
-export interface ResubmitAssetInput {
-  submittedLink: string;
-  submitterNote: string;
-}
-
-/** Creator resubmits a Revision item — back to Pending Review, version + 1. */
-export async function resubmitProjectAsset(
+/** Toggle whether the asset has been backed up to physical local storage. */
+export async function setAssetLocalBackup(
   id: string,
-  input: ResubmitAssetInput
+  value: boolean
 ): Promise<ProjectAsset> {
   const supabase = await createClient();
-
-  const { data: current, error: readErr } = await supabase
-    .from("project_assets")
-    .select("version")
-    .eq("id", id)
-    .single();
-  if (readErr || !current) {
-    throw new Error(readErr?.message ?? "Asset not found");
-  }
-
   const { data, error } = await supabase
     .from("project_assets")
-    .update({
-      submitted_link: input.submittedLink || null,
-      submitter_note: input.submitterNote || null,
-      status: "Pending Review",
-      version: (current.version as number) + 1,
-    })
+    .update({ is_backed_up_local: value })
     .eq("id", id)
     .select(ASSET_COLS)
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Failed to resubmit asset");
+    throw new Error(error?.message ?? "Failed to update backup status");
   }
   const asset = mapProjectAsset(data as ProjectAssetRow);
   revalidateIngest(asset.projectId);

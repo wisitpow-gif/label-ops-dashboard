@@ -40,7 +40,7 @@ const TASK_COLS =
 const TEMPLATE_COLS =
   "id, project_type, task_key, category, task_name, role, t_minus_days, duration_days, sort_order";
 const ASSET_COLS =
-  "id, project_id, provider_role, asset_name, status, submitted_link, vault_link, submitter_note, reviewer_note, version, created_at, updated_at";
+  "id, project_id, category, note, source_link, official_drive_link, is_backed_up_local, created_at, updated_at";
 
 // Initial dashboard payload — projects + their workback tasks.
 // tasks_with_schedule is the view that resolves deadline/start from release_date.
@@ -125,13 +125,13 @@ export async function getProjects(): Promise<Project[]> {
   return (data as ProjectRow[]).map(mapProject);
 }
 
-/** Every Vaulted asset across all projects (Library Map), newest first. */
-export async function getVaultedAssets(): Promise<ProjectAsset[]> {
+/** Every asset that reached the Official Drive, across projects (Library). */
+export async function getOfficialAssets(): Promise<ProjectAsset[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_assets")
     .select(ASSET_COLS)
-    .eq("status", "Vaulted")
+    .not("official_drive_link", "is", null)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as ProjectAssetRow[]).map(mapProjectAsset);
