@@ -275,6 +275,37 @@ export function OverviewDashboard({
 
   return (
     <div className="space-y-6">
+      {/* Personal workspace (My Tasks) — top priority for daily focus */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <CircleUser className="size-4 text-muted-foreground" />
+          My Tasks
+          {currentPerson && (
+            <span className="flex items-center gap-1.5 text-sm font-normal text-muted-foreground">
+              <Avatar className="size-5">
+                <AvatarFallback className="text-[9px]">
+                  {initialsOf(currentPerson)}
+                </AvatarFallback>
+              </Avatar>
+              {currentPerson}
+            </span>
+          )}
+        </h2>
+
+        {!currentPerson ? (
+          <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+            บัญชีของคุณยังไม่ได้เชื่อมกับสมาชิกในทีม — เพิ่มอีเมลของคุณให้ตรงกับ
+            Team Member ในหน้า Settings เพื่อดูงานส่วนตัว
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {bucket("Overdue", myOverdue, "red")}
+            {bucket("Due Today", myToday, "amber")}
+            {bucket("Upcoming", myUpcoming, "default")}
+          </div>
+        )}
+      </section>
+
       {/* KPI tiles */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
@@ -454,37 +485,6 @@ export function OverviewDashboard({
             </Card>
           </div>
         </div>
-      </section>
-
-      {/* Personal workspace */}
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <CircleUser className="size-4 text-muted-foreground" />
-          My Tasks
-          {currentPerson && (
-            <span className="flex items-center gap-1.5 text-sm font-normal text-muted-foreground">
-              <Avatar className="size-5">
-                <AvatarFallback className="text-[9px]">
-                  {initialsOf(currentPerson)}
-                </AvatarFallback>
-              </Avatar>
-              {currentPerson}
-            </span>
-          )}
-        </h2>
-
-        {!currentPerson ? (
-          <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-            บัญชีของคุณยังไม่ได้เชื่อมกับสมาชิกในทีม — เพิ่มอีเมลของคุณให้ตรงกับ
-            Team Member ในหน้า Settings เพื่อดูงานส่วนตัว
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {bucket("Overdue", myOverdue, "red")}
-            {bucket("Due Today", myToday, "amber")}
-            {bucket("Upcoming", myUpcoming, "default")}
-          </div>
-        )}
       </section>
     </div>
   );
