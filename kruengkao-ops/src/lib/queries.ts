@@ -125,13 +125,14 @@ export async function getProjects(): Promise<Project[]> {
   return (data as ProjectRow[]).map(mapProject);
 }
 
-/** Every asset that reached the Official Drive, across projects (Library). */
+/** Every asset that has landed somewhere official — a cloud/offline path OR a
+ *  local HDD backup — across projects (Library Map). */
 export async function getOfficialAssets(): Promise<ProjectAsset[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_assets")
     .select(ASSET_COLS)
-    .not("official_drive_link", "is", null)
+    .or("official_drive_link.not.is.null,is_backed_up_local.is.true")
     .order("updated_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as ProjectAssetRow[]).map(mapProjectAsset);

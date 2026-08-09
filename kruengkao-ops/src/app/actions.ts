@@ -601,10 +601,18 @@ export interface CreateAssetInput {
   projectId: string;
   category: string;
   note: string;
-  sourceLink: string;
+  /** Quick Drop: team member's temporary link. Omitted for Admin Direct Add. */
+  sourceLink?: string;
+  /** Admin Direct Add / legacy import: final cloud URL or offline storage path. */
+  officialDriveLink?: string;
+  isBackedUpLocal?: boolean;
 }
 
-/** Quick Drop: a team member drops an external source link + note + category. */
+/**
+ * Create an asset. Quick Drop passes just a source link; Admin Direct Add
+ * passes the final official_drive_link (a cloud URL *or* a plain offline path)
+ * and the local-backup flag, creating a fully-processed asset in one step.
+ */
 export async function createProjectAsset(
   input: CreateAssetInput
 ): Promise<ProjectAsset> {
@@ -615,8 +623,9 @@ export async function createProjectAsset(
       project_id: input.projectId,
       category: input.category,
       note: input.note || null,
-      source_link: input.sourceLink || null,
-      is_backed_up_local: false,
+      source_link: input.sourceLink?.trim() || null,
+      official_drive_link: input.officialDriveLink?.trim() || null,
+      is_backed_up_local: input.isBackedUpLocal ?? false,
     })
     .select(ASSET_COLS)
     .single();

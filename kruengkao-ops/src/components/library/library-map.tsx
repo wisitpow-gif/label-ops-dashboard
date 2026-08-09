@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Cloud,
   Copy,
   Disc3,
   ExternalLink,
@@ -17,9 +18,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import type { Project, ProjectAsset } from "@/lib/types";
 import { UserMenu } from "@/components/auth/user-menu";
+
+/** A cloud URL (openable) vs a plain offline storage path (copy-only). */
+const isHttp = (s?: string) =>
+  !!s && s.trim().toLowerCase().startsWith("http");
 
 async function copyLink(url: string) {
   try {
@@ -155,70 +159,75 @@ export function LibraryMap({
                 </Badge>
               </div>
               <div className="divide-y">
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center gap-2 px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium">
-                          {asset.note || "(ไม่มีชื่อ)"}
-                        </span>
-                        <Badge variant="outline">{asset.category}</Badge>
-                        {asset.isBackedUpLocal && (
-                          <span
-                            title="สำรองลง Local HDD/SSD แล้ว"
-                            className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"
-                          >
-                            <HardDrive className="size-3.5" />
+                {assets.map((asset) => {
+                  const dest = asset.officialDriveLink ?? "";
+                  const url = isHttp(dest);
+                  return (
+                    <div
+                      key={asset.id}
+                      className="flex items-start gap-2 px-3 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="truncate text-sm font-medium">
+                            {asset.note || "(ไม่มีชื่อ)"}
                           </span>
+                          <Badge variant="outline">{asset.category}</Badge>
+                          {url && (
+                            <span
+                              title="อยู่บน Cloud / Official Drive"
+                              className="text-emerald-600 dark:text-emerald-400"
+                            >
+                              <Cloud className="size-3.5" />
+                            </span>
+                          )}
+                          {asset.isBackedUpLocal && (
+                            <span
+                              title="สำรองลง Local HDD/SSD แล้ว"
+                              className="text-indigo-600 dark:text-indigo-400"
+                            >
+                              <HardDrive className="size-3.5" />
+                            </span>
+                          )}
+                        </div>
+                        {dest && (
+                          <div className="mt-0.5 break-all text-xs text-muted-foreground">
+                            {url ? dest : `📁 ${dest}`}
+                          </div>
                         )}
                       </div>
-                      {asset.officialDriveLink && (
-                        <div className="truncate text-xs text-muted-foreground">
-                          {asset.officialDriveLink}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      disabled={!asset.officialDriveLink}
-                      onClick={() =>
-                        asset.officialDriveLink &&
-                        copyLink(asset.officialDriveLink)
-                      }
-                    >
-                      <Copy data-icon="inline-start" />
-                      Copy Link
-                    </Button>
-                    <Button
-                      asChild={!!asset.officialDriveLink}
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "shrink-0 text-muted-foreground",
-                        !asset.officialDriveLink && "pointer-events-none opacity-50"
-                      )}
-                      aria-label={`เปิด ${asset.note || "asset"}`}
-                    >
-                      {asset.officialDriveLink ? (
-                        <a
-                          href={asset.officialDriveLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!dest}
+                          onClick={() => dest && copyLink(dest)}
                         >
-                          <ExternalLink />
-                        </a>
-                      ) : (
-                        <ExternalLink />
-                      )}
-                    </Button>
-                  </div>
-                ))}
+                          <Copy data-icon="inline-start" />
+                          {url ? "Copy Link" : "Copy Path"}
+                        </Button>
+                        {url && (
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground"
+                            aria-label={`เปิด ${asset.note || "asset"}`}
+                          >
+                            <a
+                              href={dest}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}

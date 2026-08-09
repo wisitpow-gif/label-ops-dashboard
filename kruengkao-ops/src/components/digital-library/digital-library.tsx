@@ -7,8 +7,10 @@ import {
   CheckCircle2,
   Cloud,
   CloudOff,
+  Copy,
   ExternalLink,
   HardDrive,
+  Import,
   Library,
   PackageOpen,
   Send,
@@ -28,7 +30,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -47,6 +60,31 @@ import {
 } from "@/app/actions";
 import type { Project, ProjectAsset } from "@/lib/types";
 import { UserMenu } from "@/components/auth/user-menu";
+
+/** A cloud URL (clickable) vs a plain offline storage path (copyable text). */
+const isHttp = (s?: string) =>
+  !!s && s.trim().toLowerCase().startsWith("http");
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("คัดลอกแล้ว");
+  } catch {
+    try {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      toast.success("คัดลอกแล้ว");
+    } catch {
+      toast.error("คัดลอกไม่สำเร็จ");
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Quick Drop bar — as fast as sending a chat message
@@ -145,8 +183,11 @@ function AssetCard({
   const [savingLink, setSavingLink] = React.useState(false);
   const [togglingLocal, setTogglingLocal] = React.useState(false);
 
-  const cloudDone = !!asset.officialDriveLink;
-  const dirty = link.trim() !== (asset.officialDriveLink ?? "");
+  const official = asset.officialDriveLink ?? "";
+  const hasOfficial = !!official;
+  const cloud = hasOfficial && isHttp(official);
+  const offlinePath = hasOfficial && !cloud;
+  const dirty = link.trim() !== official;
 
   async function saveLink() {
     setSavingLink(true);
@@ -207,7 +248,7 @@ function AssetCard({
         <Input
           value={link}
           onChange={(e) => setLink(e.target.value)}
-          placeholder="วางลิงก์ Official Google Drive ที่นี่…"
+          placeholder="ลิงก์ Official Drive หรือ path ในไดรฟ์ (เช่น [HDD-04] /2023/…)"
           className="h-8 min-w-0 flex-1"
         />
         <Button
@@ -223,30 +264,42 @@ function AssetCard({
 
       {/* Dual storage tracking */}
       <div className="flex flex-wrap items-center gap-2">
-        <Badge
-          className={cn(
-            "gap-1 border-transparent",
-            cloudDone
-              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-              : "bg-amber-500/15 text-amber-700 dark:text-amber-500"
-          )}
-        >
-          {cloudDone ? (
-            <Cloud className="size-3" />
-          ) : (
+        {!hasOfficial && (
+          <Badge className="gap-1 border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-500">
             <CloudOff className="size-3" />
-          )}
-          {cloudDone ? "Moved to Official Drive" : "Pending Verification"}
-        </Badge>
-        {cloudDone && (
-          <a
-            href={asset.officialDriveLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline dark:text-emerald-400"
-          >
-            เปิด <ExternalLink className="size-3" />
-          </a>
+            Pending Verification
+          </Badge>
+        )}
+        {cloud && (
+          <>
+            <Badge className="gap-1 border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+              <Cloud className="size-3" />
+              Moved to Official Drive
+            </Badge>
+            <a
+              href={official}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              เปิด <ExternalLink className="size-3" />
+            </a>
+          </>
+        )}
+        {offlinePath && (
+          <>
+            <Badge className="gap-1 border-transparent bg-indigo-500/15 text-indigo-700 dark:text-indigo-400">
+              <HardDrive className="size-3" />
+              Offline Path
+            </Badge>
+            <button
+              type="button"
+              onClick={() => copyText(official)}
+              className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+            >
+              <Copy className="size-3" /> Copy Path
+            </button>
+          </>
         )}
 
         <button
@@ -274,6 +327,137 @@ function AssetCard({
 }
 
 // ---------------------------------------------------------------------------
+// Admin Direct Add — backfill a fully-processed (legacy) asset in one step
+// ---------------------------------------------------------------------------
+
+function AdminAddDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: {
+    category: string;
+    note: string;
+    officialDriveLink: string;
+    isBackedUpLocal: boolean;
+  }) => Promise<void>;
+}) {
+  const [category, setCategory] = React.useState<string>(ASSET_CATEGORIES[0]);
+  const [note, setNote] = React.useState("");
+  const [official, setOfficial] = React.useState("");
+  const [local, setLocal] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function handleSave() {
+    if (!official.trim()) {
+      setError("ใส่ลิงก์ปลายทาง หรือ path ในไดรฟ์");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSubmit({
+        category,
+        note: note.trim(),
+        officialDriveLink: official.trim(),
+        isBackedUpLocal: local,
+      });
+      onOpenChange(false);
+      setNote("");
+      setOfficial("");
+      setLocal(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-md"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>Admin Direct Add (Legacy)</DialogTitle>
+          <DialogDescription>
+            เพิ่มไฟล์ที่ผ่านการตรวจแล้วโดยตรง — ข้ามขั้นตอน source link (สำหรับ backfill งานเก่า)
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Category</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ASSET_CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-note">Name / Note</Label>
+            <Input
+              id="admin-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="เช่น Master Audio v2"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-official">Official Link / Path</Label>
+            <Input
+              id="admin-official"
+              value={official}
+              onChange={(e) => setOfficial(e.target.value)}
+              placeholder="https://drive… หรือ [HDD-04] /2023_Releases/…"
+            />
+            <p className="text-xs text-muted-foreground">
+              รองรับทั้งลิงก์คลาวด์ และ path ของไดรฟ์ออฟไลน์
+            </p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={local}
+              onCheckedChange={(v) => setLocal(v === true)}
+            />
+            สำรองลง Local HDD/SSD แล้ว
+          </label>
+
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost" disabled={saving}>
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="button" onClick={handleSave} disabled={saving}>
+            <Import data-icon="inline-start" />
+            {saving ? "Adding…" : "Add to Library"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Digital Library (per project)
 // ---------------------------------------------------------------------------
 
@@ -290,6 +474,7 @@ export function DigitalLibrary({
   const [deleteTarget, setDeleteTarget] = React.useState<ProjectAsset | null>(
     null
   );
+  const [adminOpen, setAdminOpen] = React.useState(false);
 
   const officialCount = assets.filter((a) => a.officialDriveLink).length;
   const localCount = assets.filter((a) => a.isBackedUpLocal).length;
@@ -313,6 +498,20 @@ export function DigitalLibrary({
     });
     setAssets((prev) => [created, ...prev]);
     toast.success("บันทึกลงคลังแล้ว");
+  }
+
+  async function handleAdminAdd(values: {
+    category: string;
+    note: string;
+    officialDriveLink: string;
+    isBackedUpLocal: boolean;
+  }) {
+    const created = await createProjectAsset({
+      projectId: project.id,
+      ...values,
+    });
+    setAssets((prev) => [created, ...prev]);
+    toast.success("เพิ่มไฟล์ (Legacy) แล้ว");
   }
 
   async function handleSaveOfficial(id: string, link: string) {
@@ -390,8 +589,21 @@ export function DigitalLibrary({
         </div>
       </header>
 
-      {/* Quick Drop */}
-      <QuickDropBar onSubmit={handleQuickDrop} />
+      {/* Quick Drop + Admin backfill */}
+      <div className="space-y-2">
+        <QuickDropBar onSubmit={handleQuickDrop} />
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => setAdminOpen(true)}
+          >
+            <Import data-icon="inline-start" />
+            Admin Direct Add (Legacy)
+          </Button>
+        </div>
+      </div>
 
       {assets.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-16 text-center">
@@ -429,6 +641,13 @@ export function DigitalLibrary({
           })}
         </div>
       )}
+
+      {/* Admin Direct Add (Legacy import) */}
+      <AdminAddDialog
+        open={adminOpen}
+        onOpenChange={setAdminOpen}
+        onSubmit={handleAdminAdd}
+      />
 
       {/* Delete */}
       <AlertDialog
