@@ -167,10 +167,10 @@ function AssetCard({
   }
 
   return (
-    <div className="space-y-2.5 rounded-lg border bg-background p-3">
+    <div className="min-w-0 space-y-2.5 overflow-hidden rounded-lg border bg-background p-3">
       {/* Note + source link + delete */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">
             {asset.note || "(ไม่มีชื่อ)"}
           </div>
@@ -180,7 +180,7 @@ function AssetCard({
               target="_blank"
               rel="noopener noreferrer"
               title={asset.sourceLink}
-              className="mt-0.5 block truncate text-xs text-blue-600 hover:underline dark:text-blue-400"
+              className="mt-0.5 block whitespace-normal break-all text-xs text-blue-600 hover:underline dark:text-blue-400"
             >
               <ExternalLink className="mr-1 inline size-3 align-[-1px]" />
               Source: {asset.sourceLink}
@@ -413,7 +413,7 @@ export function DigitalLibrary({
                     {items.length}
                   </span>
                 </div>
-                <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {items.map((asset) => (
                     <AssetCard
                       key={asset.id}
