@@ -62,6 +62,7 @@ export function DashboardShell({
   userEmail,
   taskTemplates = [],
   currentPerson = null,
+  initialTab = "overview",
 }: {
   initialProjects: Project[];
   initialTasks: Task[];
@@ -69,6 +70,8 @@ export function DashboardShell({
   taskTemplates?: TaskTemplate[];
   /** Team-member name matched to the signed-in user (drives "My Tasks"). */
   currentPerson?: string | null;
+  /** Which tab to open on mount (from the ?tab= query param). */
+  initialTab?: string;
 }) {
   const [projects, setProjects] = React.useState<Project[]>(initialProjects);
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
@@ -323,7 +326,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <Tabs defaultValue="overview">
+        <Tabs defaultValue={initialTab}>
           <TabsList>
             <TabsTrigger value="overview">
               <LayoutDashboard data-icon="inline-start" />
