@@ -428,18 +428,38 @@ export function KanbanBoard({
     );
   };
 
-  // Group a column's tasks by project (preserving deadline order, so project
-  // groups appear by their earliest task), each under a sticky project header.
+  // Group a column's tasks by project, each under a sticky project header.
+  // The `list` arrives already deadline-sorted, so tasks *within* each group
+  // stay in ascending order; here we additionally sort the GROUPS themselves
+  // by urgency so the most immediate project floats to the top of the column.
   const renderGroupedTasks = (list: Task[], columnRole: string) => {
-    const order: string[] = [];
     const byProject = new Map<string, Task[]>();
     for (const t of list) {
-      if (!byProject.has(t.projectId)) {
-        byProject.set(t.projectId, []);
-        order.push(t.projectId);
-      }
+      if (!byProject.has(t.projectId)) byProject.set(t.projectId, []);
       byProject.get(t.projectId)!.push(t);
     }
+
+    // A group's urgency = the earliest deadline among its ACTIVE (non-Done)
+    // tasks in this column; if every task is Done (terminal columns keep them
+    // visible) fall back to all tasks so the key stays finite. Groups sort by
+    // this ascending — earliest-deadline project always on top.
+    const groupUrgency = (groupTasks: Task[]) => {
+      const active = groupTasks.filter((t) => t.status !== "Done");
+      const pool = active.length > 0 ? active : groupTasks;
+      let earliest = Number.POSITIVE_INFINITY;
+      for (const t of pool) {
+        const p = projectById.get(t.projectId);
+        if (!p) continue;
+        const ms = taskDeadline(t, p).getTime();
+        if (ms < earliest) earliest = ms;
+      }
+      return earliest;
+    };
+
+    const order = [...byProject.keys()].toSorted(
+      (a, b) => groupUrgency(byProject.get(a)!) - groupUrgency(byProject.get(b)!)
+    );
+
     return order.map((pid) => {
       const project = projectById.get(pid);
       if (!project) return null;
