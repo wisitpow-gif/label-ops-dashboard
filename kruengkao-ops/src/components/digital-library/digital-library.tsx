@@ -98,16 +98,16 @@ function QuickDropBar({
         value={sourceLink}
         onChange={(e) => setSourceLink(e.target.value)}
         placeholder="วางลิงก์ต้นทาง (Drive / Dropbox / WeTransfer…)"
-        className="bg-background sm:flex-1"
+        className="w-full min-w-0 bg-background sm:flex-1"
       />
       <Input
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="โน้ต / ชื่อไฟล์"
-        className="bg-background sm:w-48"
+        className="w-full bg-background sm:w-48"
       />
       <Select value={category} onValueChange={setCategory}>
-        <SelectTrigger className="bg-background sm:w-44">
+        <SelectTrigger className="w-full bg-background sm:w-44">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -179,10 +179,11 @@ function AssetCard({
               href={asset.sourceLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-0.5 flex items-center gap-1 truncate text-xs text-blue-600 hover:underline dark:text-blue-400"
+              title={asset.sourceLink}
+              className="mt-0.5 block truncate text-xs text-blue-600 hover:underline dark:text-blue-400"
             >
-              <ExternalLink className="size-3 shrink-0" />
-              <span className="truncate">Source: {asset.sourceLink}</span>
+              <ExternalLink className="mr-1 inline size-3 align-[-1px]" />
+              Source: {asset.sourceLink}
             </a>
           ) : (
             <span className="text-xs text-muted-foreground">
@@ -207,13 +208,14 @@ function AssetCard({
           value={link}
           onChange={(e) => setLink(e.target.value)}
           placeholder="วางลิงก์ Official Google Drive ที่นี่…"
-          className="h-8"
+          className="h-8 min-w-0 flex-1"
         />
         <Button
           size="sm"
           variant={dirty ? "default" : "outline"}
           disabled={savingLink || !dirty}
           onClick={saveLink}
+          className="shrink-0"
         >
           {savingLink ? "…" : "Save"}
         </Button>
@@ -352,7 +354,7 @@ export function DigitalLibrary({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 p-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6">
       <header className="space-y-3">
         <Link
           href="/"
