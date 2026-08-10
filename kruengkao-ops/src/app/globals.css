@@ -132,3 +132,27 @@
   --font-sans: var(--font-geist-sans), var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Thin, low-contrast scrollbar for internally-scrolling panels (e.g. the
+   My Tasks buckets) so overflow stays usable without cluttering the UI.
+   Track is transparent; the thumb picks up the theme border color and only
+   darkens slightly on hover. */
+@utility scrollbar-subtle {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+}
+

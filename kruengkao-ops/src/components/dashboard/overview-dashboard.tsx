@@ -260,7 +260,7 @@ export function OverviewDashboard({
             {items.length}
           </span>
         </div>
-        <div className="space-y-2 p-2">
+        <div className="scrollbar-subtle max-h-[380px] space-y-2 overflow-y-auto p-2">
           {items.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted-foreground">
               ไม่มีงาน
