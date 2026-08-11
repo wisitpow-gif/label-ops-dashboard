@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { addDays, parseDate, toISODate } from "@/lib/dates";
+import { addDays, diffDays, parseDate, toISODate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import {
   mapProject,
@@ -270,6 +270,81 @@ export async function updateTask(
 
   revalidatePath("/");
   revalidatePath("/internal");
+}
+
+export interface CreateProjectTaskInput {
+  projectId: string;
+  /** Locked pipeline category the "+ Add Task" button was clicked under. */
+  category: string;
+  taskName: string;
+  role: string;
+  /** Owner — required (accountability for ad-hoc tasks). */
+  person: string;
+  startDate: string; // yyyy-mm-dd
+  endDate: string; // yyyy-mm-dd
+  /** Release date, so T-minus / duration stay meaningful for the workback UI. */
+  releaseDate: string; // yyyy-mm-dd
+}
+
+/**
+ * Add a single ad-hoc task to a Release project under a chosen category.
+ * Stores the explicit start/end range (which the UI prefers over workback) and
+ * derives t_minus_days / duration_days from the release date so the "(T-N)"
+ * label and Gantt bar read correctly. Appended to the end of the project's
+ * sort order. An owner (assigned_to) is mandatory.
+ */
+export async function createProjectTask(
+  input: CreateProjectTaskInput
+): Promise<Task> {
+  const person = input.person?.trim();
+  if (!person) {
+    throw new Error("ต้องระบุผู้รับผิดชอบ (Assignee)");
+  }
+
+  const supabase = await createClient();
+
+  // Append after the project's current tasks.
+  const { data: last } = await supabase
+    .from("tasks")
+    .select("sort_order")
+    .eq("project_id", input.projectId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextSort = ((last?.sort_order as number | undefined) ?? -1) + 1;
+
+  const start = parseDate(input.startDate);
+  const end = parseDate(input.endDate);
+  const durationDays = Math.max(0, diffDays(start, end));
+  const tMinusDays = diffDays(end, parseDate(input.releaseDate));
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      id: crypto.randomUUID(),
+      project_id: input.projectId,
+      task_key: null,
+      category: input.category,
+      task_name: input.taskName.trim(),
+      role: input.role,
+      assigned_to: person,
+      status: "Not Start",
+      t_minus_days: tMinusDays,
+      duration_days: durationDays,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      blocked_by: null,
+      sort_order: nextSort,
+    })
+    .select(TASK_COLS)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to add task");
+  }
+
+  revalidatePath("/");
+  return mapTask(data as TaskRow);
 }
 
 /** Delete a project; tasks/expenses/splits cascade via the FK constraints. */

@@ -35,6 +35,7 @@ const BAR_STYLES: Record<TaskStatus, string> = {
 const GROUP_DOTS: Record<string, string> = {
   "Digital Distribution Pack": "bg-violet-500",
   "TEASER & MV": "bg-amber-500",
+  "Online Content": "bg-teal-500",
 };
 
 const LABEL_W = "w-64"; // keep the header spacer and every row in sync

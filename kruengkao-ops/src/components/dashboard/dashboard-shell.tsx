@@ -33,17 +33,28 @@ import {
 } from "@/components/ui/tooltip";
 import { parseDate, toISODate } from "@/lib/dates";
 import { PROJECT_TYPES } from "@/lib/constants";
-import type { Project, ProjectType, Task, TaskTemplate } from "@/lib/types";
+import type {
+  Project,
+  ProjectType,
+  Task,
+  TaskGroup,
+  TaskTemplate,
+} from "@/lib/types";
 import { toast } from "sonner";
 
 import {
   createProject,
+  createProjectTask,
   deleteProject,
   updateProject,
   updateTask,
 } from "@/app/actions";
 import { UserMenu } from "@/components/auth/user-menu";
 import { CalendarView } from "./calendar-view";
+import {
+  CreateTaskDialog,
+  type CreateTaskValues,
+} from "./create-task-dialog";
 import { EditTaskDialog, type EditTaskPatch } from "./edit-task-dialog";
 import { GanttChart } from "./gantt-chart";
 import { KanbanBoard } from "./kanban-board";
@@ -85,6 +96,11 @@ export function DashboardShell({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editProject, setEditProject] = React.useState<Project | null>(null);
   const [editTask, setEditTask] = React.useState<Task | null>(null);
+  // Ad-hoc "+ Add Task" context: which project + locked category to create under.
+  const [addTaskCtx, setAddTaskCtx] = React.useState<{
+    project: Project;
+    category: TaskGroup;
+  } | null>(null);
 
   // Persist the new project + its template tasks, then merge into local state.
   async function handleCreate(values: ProjectFormSubmit) {
@@ -206,6 +222,45 @@ export function DashboardShell({
         const restore = previous;
         setTasks((cur) => cur.map((t) => (t.id === taskId ? restore : t)));
       }
+      throw err;
+    }
+  }
+
+  // Create an ad-hoc task under a locked category. Renders optimistically at
+  // the bottom of that category's list, then reconciles with the DB row (or
+  // rolls back + rethrows so the modal surfaces the error and stays open).
+  async function handleTaskCreate(values: CreateTaskValues) {
+    if (!addTaskCtx) return;
+    const { project, category } = addTaskCtx;
+    const tempId = crypto.randomUUID();
+    const optimistic: Task = {
+      id: tempId,
+      projectId: project.id,
+      group: category,
+      name: values.taskName,
+      tMinusDays: 0,
+      durationDays: 0,
+      status: "Not Start",
+      role: values.role,
+      person: values.person,
+      startDate: values.startDate,
+      endDate: values.endDate,
+    };
+    setTasks((prev) => [...prev, optimistic]);
+    try {
+      const created = await createProjectTask({
+        projectId: project.id,
+        category,
+        taskName: values.taskName,
+        role: values.role,
+        person: values.person,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        releaseDate: project.releaseDate,
+      });
+      setTasks((prev) => prev.map((t) => (t.id === tempId ? created : t)));
+    } catch (err) {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
       throw err;
     }
   }
@@ -367,6 +422,9 @@ export function DashboardShell({
               onEditProject={setEditProject}
               onDeleteProject={handleDeleteProject}
               onEditTask={setEditTask}
+              onAddTask={(project, category) =>
+                setAddTaskCtx({ project, category })
+              }
             />
           </TabsContent>
           <TabsContent value="kanban">
@@ -421,6 +479,20 @@ export function DashboardShell({
           values={editValues}
           onSubmit={handleUpdateProject}
         />
+
+        {/* Create ad-hoc task — category locked to the button that opened it */}
+        {addTaskCtx && (
+          <CreateTaskDialog
+            key={`${addTaskCtx.project.id}:${addTaskCtx.category}`}
+            project={addTaskCtx.project}
+            category={addTaskCtx.category}
+            open
+            onOpenChange={(open) => {
+              if (!open) setAddTaskCtx(null);
+            }}
+            onCreate={handleTaskCreate}
+          />
+        )}
 
         {/* Edit task (name + deadline) — keyed so fields re-init per task */}
         {editTask && (

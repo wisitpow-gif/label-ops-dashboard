@@ -210,6 +210,7 @@ export function packStatus(tasks: Task[]): TaskStatus {
 export const TASK_GROUPS: TaskGroup[] = [
   "Digital Distribution Pack",
   "TEASER & MV",
+  "Online Content",
 ];
 
 // Label / Artist master data now lives in lib/constants.ts (LABEL_ARTISTS_DATA).

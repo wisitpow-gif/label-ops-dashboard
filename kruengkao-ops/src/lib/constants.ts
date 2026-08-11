@@ -51,6 +51,7 @@ export const PROJECT_TYPES = [
 export const TEMPLATE_CATEGORIES = [
   "Digital Distribution Pack",
   "TEASER & MV",
+  "Online Content",
 ] as const;
 
 // Asset categories for the Digital Library "Quick Drop" + grouping.

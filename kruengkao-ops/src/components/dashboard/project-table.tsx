@@ -11,6 +11,7 @@ import {
   Link2,
   MoreHorizontal,
   Pencil,
+  Plus,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -141,7 +142,7 @@ function SubTaskRow({
   );
 }
 
-/** A single task-category card: header + its sub-task rows */
+/** A single task-category card: header + its sub-task rows + append button */
 function GroupCard({
   title,
   groupTasks,
@@ -149,6 +150,7 @@ function GroupCard({
   allTasks,
   onTaskUpdate,
   onEditTask,
+  onAddTask,
 }: {
   title: TaskGroup;
   groupTasks: Task[];
@@ -156,6 +158,8 @@ function GroupCard({
   allTasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onEditTask: (task: Task) => void;
+  /** Open the Create Custom Task modal pre-filled with this category. */
+  onAddTask: (project: Project, category: TaskGroup) => void;
 }) {
   return (
     <div className="h-fit overflow-hidden rounded-lg border bg-background">
@@ -174,60 +178,58 @@ function GroupCard({
             onEditTask={onEditTask}
           />
         ))}
+        {groupTasks.length === 0 && (
+          <p className="px-3 py-2 text-xs text-muted-foreground">ยังไม่มีงาน</p>
+        )}
       </div>
+      {/* List-append: subtle, dashed, blends into the card footer. */}
+      <button
+        type="button"
+        onClick={() => onAddTask(project, title)}
+        className="flex w-full items-center justify-center gap-1.5 border-t border-dashed px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+      >
+        <Plus className="size-3.5" />
+        Add Task
+      </button>
     </div>
   );
 }
 
-/** Expanded panel under a project row: two explicit side-by-side columns */
+/** Expanded panel under a project row: one card per pipeline category */
 function SubTaskPanel({
   project,
   tasks,
   onTaskUpdate,
   onEditTask,
+  onAddTask,
 }: {
   project: Project;
   tasks: Task[];
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onEditTask: (task: Task) => void;
+  onAddTask: (project: Project, category: TaskGroup) => void;
 }) {
-  // Split into the two categories, each sorted chronologically by deadline
-  // (earliest end_date first).
+  // Each category's tasks sorted chronologically by deadline (earliest first).
   const byDeadline = (a: Task, b: Task) =>
     taskDeadline(a, project).getTime() - taskDeadline(b, project).getTime();
-  const digitalTasks = tasks
-    .filter((t) => t.group === "Digital Distribution Pack")
-    .toSorted(byDeadline);
-  const teaserTasks = tasks
-    .filter((t) => t.group === "TEASER & MV")
-    .toSorted(byDeadline);
 
   return (
     <div className="bg-muted/40 p-4">
-      <div className="grid w-full grid-cols-1 items-start gap-8 md:grid-cols-2">
-        {/* LEFT COLUMN — Digital Distribution Pack */}
-        <div>
+      <div className="grid w-full grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {TASK_GROUPS.map((group) => (
           <GroupCard
-            title="Digital Distribution Pack"
-            groupTasks={digitalTasks}
+            key={group}
+            title={group}
+            groupTasks={tasks
+              .filter((t) => t.group === group)
+              .toSorted(byDeadline)}
             project={project}
             allTasks={tasks}
             onTaskUpdate={onTaskUpdate}
             onEditTask={onEditTask}
+            onAddTask={onAddTask}
           />
-        </div>
-
-        {/* RIGHT COLUMN — TEASER & MV */}
-        <div>
-          <GroupCard
-            title="TEASER & MV"
-            groupTasks={teaserTasks}
-            project={project}
-            allTasks={tasks}
-            onTaskUpdate={onTaskUpdate}
-            onEditTask={onEditTask}
-          />
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -263,6 +265,7 @@ export function ProjectTable({
   onEditProject,
   onDeleteProject,
   onEditTask,
+  onAddTask,
 }: {
   projects: Project[];
   tasks: Task[];
@@ -271,6 +274,7 @@ export function ProjectTable({
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
   onEditTask: (task: Task) => void;
+  onAddTask: (project: Project, category: TaskGroup) => void;
 }) {
   const [expanded, setExpanded] = React.useState<Set<string>>(
     () => new Set(["1"])
@@ -312,7 +316,7 @@ export function ProjectTable({
   }, [projects, tasks]);
 
   return (
-    <div className="overflow-hidden rounded-xl border">
+    <div className="overflow-x-auto rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -510,6 +514,7 @@ export function ProjectTable({
                         tasks={projectTasks}
                         onTaskUpdate={onTaskUpdate}
                         onEditTask={onEditTask}
+                        onAddTask={onAddTask}
                       />
                     </TableCell>
                   </TableRow>
