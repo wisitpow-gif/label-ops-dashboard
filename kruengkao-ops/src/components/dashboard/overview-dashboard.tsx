@@ -190,7 +190,8 @@ export function OverviewDashboard({
         </span>
       </div>
       <div className="mt-0.5 truncate text-xs text-muted-foreground">
-        {e.project.songName} · {e.project.label}
+        {e.project.songName} · {e.project.artistName}
+        {e.project.label ? ` · ${e.project.label}` : ""}
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
         {assignee(e.task.person)}
@@ -218,7 +219,8 @@ export function OverviewDashboard({
         </span>
       </div>
       <div className="mt-0.5 truncate text-xs text-muted-foreground">
-        {e.project.songName} · {e.project.label}
+        {e.project.songName} · {e.project.artistName}
+        {e.project.label ? ` · ${e.project.label}` : ""}
       </div>
       <div className="mt-2">
         <StatusSelect
