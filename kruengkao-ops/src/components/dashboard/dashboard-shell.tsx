@@ -32,7 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { parseDate, toISODate } from "@/lib/dates";
-import { PROJECT_TYPES } from "@/lib/constants";
+import { PROJECT_TYPES, projectTypeEmoji } from "@/lib/constants";
 import type {
   Project,
   ProjectType,
@@ -328,6 +328,7 @@ export function DashboardShell({
                       checked={selectedTypes.has(type)}
                       onCheckedChange={() => toggleType(type)}
                     />
+                    <span aria-hidden>{projectTypeEmoji(type)}</span>
                     {type}
                   </label>
                 ))}

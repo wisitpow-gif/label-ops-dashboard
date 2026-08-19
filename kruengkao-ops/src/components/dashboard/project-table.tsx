@@ -46,6 +46,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { formatFull, formatShort, parseDate, startOfToday } from "@/lib/dates";
 import { TASK_GROUPS, packStatus, taskDeadline } from "@/lib/mock-data";
+import {
+  PROJECT_TYPES,
+  projectTypeEmoji,
+  projectTypeLabel,
+} from "@/lib/constants";
 import type { Project, Task, TaskGroup } from "@/lib/types";
 import { StatusBadge } from "./status-badge";
 import { AssigneeSelect, StatusSelect } from "./task-controls";
@@ -289,20 +294,53 @@ export function ProjectTable({
       return next;
     });
 
-  // Done starts collapsed so the view opens focused on actionable work.
-  const [collapsedSections, setCollapsedSections] = React.useState<
-    Set<ProjectPhase>
-  >(() => new Set<ProjectPhase>(["Done"]));
-  const toggleSection = (key: ProjectPhase) =>
-    setCollapsedSections((prev) => {
+  // Group rows by lifecycle Status (default) or by Project Type.
+  const [groupBy, setGroupBy] = React.useState<"status" | "type">("status");
+
+  // Section collapse — keyed by section key (phase or type). Done starts folded.
+  const [collapsed, setCollapsed] = React.useState<Set<string>>(
+    () => new Set<string>(["Done"])
+  );
+  const toggleSection = (key: string) =>
+    setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
 
-  // Bucket the (already release-date-sorted) projects by lifecycle phase.
-  const sections = React.useMemo(() => {
+  interface Section {
+    key: string;
+    label: string;
+    dot: string | null; // color dot (status) — types use an emoji in the label
+    hint: string;
+    projects: Project[];
+  }
+
+  // Bucket the (already release-date-sorted) projects for the active grouping.
+  const sections = React.useMemo<Section[]>(() => {
+    if (groupBy === "type") {
+      const byType = new Map<string, Project[]>();
+      for (const p of projects) {
+        if (!byType.has(p.projectType)) byType.set(p.projectType, []);
+        byType.get(p.projectType)!.push(p);
+      }
+      // Canonical type order (PROJECT_TYPES); unknown types sort last.
+      const rank = (t: string) => {
+        const i = (PROJECT_TYPES as readonly string[]).indexOf(t);
+        return i === -1 ? PROJECT_TYPES.length : i;
+      };
+      return [...byType.keys()]
+        .toSorted((a, b) => rank(a) - rank(b))
+        .map((type) => ({
+          key: type,
+          label: projectTypeLabel(type),
+          dot: null,
+          hint: "",
+          projects: byType.get(type)!,
+        }));
+    }
+
     const buckets: Record<ProjectPhase, Project[]> = {
       Ongoing: [],
       Todo: [],
@@ -312,12 +350,43 @@ export function ProjectTable({
       const phase = projectPhase(tasks.filter((t) => t.projectId === p.id));
       buckets[phase].push(p);
     }
-    return PHASES.map((ph) => ({ ...ph, projects: buckets[ph.key] }));
-  }, [projects, tasks]);
+    return PHASES.map((ph) => ({
+      key: ph.key,
+      label: ph.label,
+      dot: ph.dot,
+      hint: ph.hint,
+      projects: buckets[ph.key],
+    }));
+  }, [groupBy, projects, tasks]);
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <Table>
+    <div className="space-y-3">
+      {/* Group-by toggle — Status (lifecycle) vs Project Type */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">
+          Group by
+        </span>
+        <div className="inline-flex rounded-lg border p-0.5">
+          {(["status", "type"] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGroupBy(g)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                groupBy === g
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border">
+        <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead className="w-36">Release Date</TableHead>
@@ -344,7 +413,7 @@ export function ProjectTable({
           )}
           {sections.map((section) => {
             if (section.projects.length === 0) return null;
-            const collapsed = collapsedSections.has(section.key);
+            const isCollapsed = collapsed.has(section.key);
             return (
               <React.Fragment key={`section-${section.key}`}>
                 <TableRow
@@ -356,27 +425,31 @@ export function ProjectTable({
                     className="cursor-pointer py-2"
                   >
                     <div className="flex items-center gap-2">
-                      {collapsed ? (
+                      {isCollapsed ? (
                         <ChevronRight className="size-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="size-4 text-muted-foreground" />
                       )}
-                      <span
-                        className={cn("size-2.5 rounded-full", section.dot)}
-                      />
+                      {section.dot && (
+                        <span
+                          className={cn("size-2.5 rounded-full", section.dot)}
+                        />
+                      )}
                       <span className="text-sm font-semibold">
                         {section.label}
                       </span>
                       <span className="rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground">
                         {section.projects.length}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {section.hint}
-                      </span>
+                      {section.hint && (
+                        <span className="text-xs text-muted-foreground">
+                          {section.hint}
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
-                {!collapsed &&
+                {!isCollapsed &&
                   section.projects.map((project) => {
                     const projectTasks = tasks.filter(
                       (t) => t.projectId === project.id
@@ -413,7 +486,15 @@ export function ProjectTable({
                         )}
                       </Button>
                       <div>
-                        <div className="font-medium">{project.songName}</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <span
+                            title={project.projectType}
+                            className="text-sm leading-none"
+                          >
+                            {projectTypeEmoji(project.projectType)}
+                          </span>
+                          {project.songName}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {project.artistName} · {project.label}
                         </div>
@@ -527,6 +608,7 @@ export function ProjectTable({
           })}
         </TableBody>
       </Table>
+      </div>
 
       <AlertDialog
         open={!!deleteTarget}

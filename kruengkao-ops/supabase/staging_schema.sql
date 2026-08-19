@@ -37,7 +37,7 @@ create table public.projects (
   isrc_code     text,
   drive_folder_url text,
   project_type  text not null default 'Single'
-                  check (project_type in ('Single', 'Album', 'Live Session', 'Other')),
+                  check (project_type in ('Single', 'Album', 'Live Session', 'Concert', 'Other')),
   work_type     text not null default 'Release'
                   check (work_type in ('Release', 'Internal')),
   target_date   date,
@@ -51,8 +51,8 @@ create trigger trg_projects_updated_at
 
 -- ── tasks ───────────────────────────────────────────────────────────────────
 -- category is FREE TEXT (not null). Production dropped the original CHECK in
--- migration 0005 so ad-hoc categories work: 'Digital Distribution Pack',
--- 'TEASER & MV', 'Online Content' (new), and 'General' (Internal tasks).
+-- migration 0005 so ad-hoc categories work: 'Demo', 'Digital Distribution
+-- Pack', 'TEASER & MV', 'Online Content', and 'General' (Internal tasks).
 -- task_key is nullable so ad-hoc tasks (which have no template key) insert fine.
 create table public.tasks (
   id            uuid primary key default gen_random_uuid(),
@@ -79,7 +79,7 @@ create table public.tasks (
 -- Enable ONLY if you want the DB to enforce the category set. It MUST include
 -- 'General', or every Internal/Ad-Hoc task insert will fail.
 -- alter table public.tasks add constraint tasks_category_check
---   check (category in ('Digital Distribution Pack', 'TEASER & MV', 'Online Content', 'General'));
+--   check (category in ('Demo', 'Digital Distribution Pack', 'TEASER & MV', 'Online Content', 'General'));
 
 create index idx_tasks_project_id on public.tasks(project_id);
 create index idx_tasks_blocked_by on public.tasks(blocked_by);
@@ -104,7 +104,7 @@ join public.projects p on p.id = t.project_id;
 create table public.task_templates (
   id            uuid primary key default gen_random_uuid(),
   project_type  text not null default 'Single'
-                  check (project_type in ('Single', 'Album', 'Live Session', 'Other')),
+                  check (project_type in ('Single', 'Album', 'Live Session', 'Concert', 'Other')),
   task_key      text not null,
   category      text not null,                 -- free text: accepts 'Online Content'
   task_name     text not null,

@@ -208,6 +208,7 @@ export function packStatus(tasks: Task[]): TaskStatus {
 }
 
 export const TASK_GROUPS: TaskGroup[] = [
+  "Demo",
   "Digital Distribution Pack",
   "TEASER & MV",
   "Online Content",

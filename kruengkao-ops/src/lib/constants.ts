@@ -44,11 +44,33 @@ export const PROJECT_TYPES = [
   "Single",
   "Album",
   "Live Session",
+  "Concert",
   "Other",
 ] as const;
 
-// Task categories available in the template editor.
+// A small emoji per project type — a visual identifier shown wherever the
+// type appears (project rows, type-group headers, filters, forms).
+export const PROJECT_TYPE_EMOJI: Record<string, string> = {
+  Single: "🎵",
+  Album: "💿",
+  "Live Session": "🎙️",
+  Concert: "🎫",
+  Other: "🎧",
+};
+
+export function projectTypeEmoji(type: string): string {
+  return PROJECT_TYPE_EMOJI[type] ?? "🎧";
+}
+
+/** "🎵 Single" — emoji + type, for dropdowns and headers. */
+export function projectTypeLabel(type: string): string {
+  return `${projectTypeEmoji(type)} ${type}`;
+}
+
+// Task categories available in the template editor. "Demo" is the upstream
+// A&R phase (selecting artist demos) and leads the pipeline.
 export const TEMPLATE_CATEGORIES = [
+  "Demo",
   "Digital Distribution Pack",
   "TEASER & MV",
   "Online Content",

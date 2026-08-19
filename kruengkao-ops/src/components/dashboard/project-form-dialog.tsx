@@ -33,7 +33,12 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { addDays, diffDays, formatFull } from "@/lib/dates";
-import { LABELS, PROJECT_TYPES, artistsForLabel } from "@/lib/constants";
+import {
+  LABELS,
+  PROJECT_TYPES,
+  artistsForLabel,
+  projectTypeLabel,
+} from "@/lib/constants";
 import { TEAM_ROLES } from "@/lib/team";
 import { useTeam } from "@/components/team/team-provider";
 import type { CustomTaskInput, TaskTemplate } from "@/lib/types";
@@ -289,7 +294,7 @@ export function ProjectFormDialog({
                       <SelectContent>
                         {PROJECT_TYPES.map((t) => (
                           <SelectItem key={t} value={t}>
-                            {t}
+                            {projectTypeLabel(t)}
                           </SelectItem>
                         ))}
                       </SelectContent>
