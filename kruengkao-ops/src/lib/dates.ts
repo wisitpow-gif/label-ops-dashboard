@@ -59,3 +59,16 @@ export function formatFull(date: Date): string {
 export function formatLongDate(date: Date): string {
   return thaiLong.format(date);
 }
+
+// Day + short month + 24h time, e.g. "19 ส.ค. 15:30" — for comment timestamps.
+const thaiDateTime = new Intl.DateTimeFormat("th-TH", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+export function formatDateTime(date: Date): string {
+  return thaiDateTime.format(date);
+}

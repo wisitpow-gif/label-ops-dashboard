@@ -8,6 +8,7 @@ create extension if not exists pgcrypto;   -- gen_random_uuid()
 
 -- ── Clean slate (children first because of FKs) ─────────────────────────────
 drop view  if exists public.tasks_with_schedule;
+drop table if exists public.task_comments;
 drop table if exists public.task_dependencies;
 drop table if exists public.project_assets;
 drop table if exists public.production_expenses;
@@ -211,6 +212,18 @@ create table public.task_dependencies (
 create index idx_task_deps_task       on public.task_dependencies(task_id);
 create index idx_task_deps_depends_on on public.task_dependencies(depends_on_task_id);
 
+-- ── task_comments (0013) — discussion thread per task ───────────────────────
+create table public.task_comments (
+  id          uuid primary key default gen_random_uuid(),
+  task_id     uuid not null references public.tasks(id) on delete cascade,
+  author_id   uuid references public.team_members(id) on delete set null,
+  author_name text not null,                 -- denormalized display name
+  content     text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index idx_task_comments_task_id on public.task_comments(task_id);
+
 -- ── production_expenses (base schema) ───────────────────────────────────────
 create table public.production_expenses (
   id             uuid primary key default gen_random_uuid(),
@@ -291,6 +304,7 @@ alter table public.task_templates      enable row level security;
 alter table public.project_assets      enable row level security;
 alter table public.team_members        enable row level security;
 alter table public.task_dependencies   enable row level security;
+alter table public.task_comments       enable row level security;
 alter table public.production_expenses enable row level security;
 alter table public.royalty_splits      enable row level security;
 
@@ -300,5 +314,6 @@ create policy authed_all_task_templates    on public.task_templates      for all
 create policy authed_all_project_assets    on public.project_assets      for all to authenticated using (true) with check (true);
 create policy authed_all_team_members      on public.team_members        for all to authenticated using (true) with check (true);
 create policy authed_all_task_dependencies on public.task_dependencies   for all to authenticated using (true) with check (true);
+create policy authed_all_task_comments     on public.task_comments       for all to authenticated using (true) with check (true);
 create policy authed_all_expenses          on public.production_expenses for all to authenticated using (true) with check (true);
 create policy authed_all_splits            on public.royalty_splits      for all to authenticated using (true) with check (true);

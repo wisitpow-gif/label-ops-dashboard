@@ -3,6 +3,7 @@ import type {
   ProjectAsset,
   ProjectType,
   Task,
+  TaskComment,
   TaskDependency,
   TaskGroup,
   TaskStatus,
@@ -133,6 +134,26 @@ export function mapTaskDependency(row: TaskDependencyRow): TaskDependency {
     id: row.id,
     taskId: row.task_id,
     dependsOnTaskId: row.depends_on_task_id,
+  };
+}
+
+export interface TaskCommentRow {
+  id: string;
+  task_id: string;
+  author_id: string | null;
+  author_name: string;
+  content: string;
+  created_at: string;
+}
+
+export function mapTaskComment(row: TaskCommentRow): TaskComment {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    authorId: row.author_id ?? undefined,
+    authorName: row.author_name,
+    content: row.content,
+    createdAt: row.created_at,
   };
 }
 

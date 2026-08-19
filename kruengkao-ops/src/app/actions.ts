@@ -8,11 +8,13 @@ import {
   mapProject,
   mapProjectAsset,
   mapTask,
+  mapTaskComment,
   mapTaskDependency,
   mapTaskTemplate,
   mapTeamMember,
   type ProjectAssetRow,
   type ProjectRow,
+  type TaskCommentRow,
   type TaskDependencyRow,
   type TaskRow,
   type TaskTemplateRow,
@@ -23,6 +25,7 @@ import type {
   Project,
   ProjectAsset,
   Task,
+  TaskComment,
   TaskDependency,
   TaskTemplate,
   TeamMember,
@@ -915,4 +918,74 @@ export async function removeTaskDependency(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/internal");
+}
+
+// ---------------------------------------------------------------------------
+// Task comments (discussion thread in the Edit Task modal)
+// ---------------------------------------------------------------------------
+
+const TASK_COMMENT_COLS =
+  "id, task_id, author_id, author_name, content, created_at";
+
+/** A task's comment thread, oldest first. */
+export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("task_comments")
+    .select(TASK_COMMENT_COLS)
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as TaskCommentRow[]).map(mapTaskComment);
+}
+
+/**
+ * Post a comment. The author is resolved from the signed-in user's email →
+ * team member (author_id); author_name is denormalized for display and falls
+ * back to the email's local part when the user isn't a linked member.
+ */
+export async function createTaskComment(
+  taskId: string,
+  content: string
+): Promise<TaskComment> {
+  const body = content.trim();
+  if (!body) throw new Error("ความคิดเห็นว่างเปล่า");
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const email = user?.email?.toLowerCase() ?? null;
+
+  let authorId: string | null = null;
+  let authorName = email ? email.split("@")[0] : "ไม่ทราบชื่อ";
+  if (email) {
+    const { data: member } = await supabase
+      .from("team_members")
+      .select("id, name")
+      .eq("email", email)
+      .limit(1)
+      .maybeSingle();
+    if (member) {
+      authorId = (member as { id: string }).id;
+      authorName = (member as { name: string }).name;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("task_comments")
+    .insert({
+      task_id: taskId,
+      author_id: authorId,
+      author_name: authorName,
+      content: body,
+    })
+    .select(TASK_COMMENT_COLS)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to post comment");
+  }
+  return mapTaskComment(data as TaskCommentRow);
 }

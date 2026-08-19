@@ -34,6 +34,19 @@ export interface TaskDependency {
   dependsOnTaskId: string;
 }
 
+/** One message in a task's discussion thread. */
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  /** team_members.id of the author (null if the user isn't a linked member). */
+  authorId?: string;
+  /** Denormalized display name — rendered directly, no join needed. */
+  authorName: string;
+  content: string;
+  /** ISO timestamp. */
+  createdAt: string;
+}
+
 // --- DAM: Digital Asset Management (Quick Drop → verify → official → backup) ---
 
 /** One row of project_assets — a submitted file tracked across cloud + local. */
