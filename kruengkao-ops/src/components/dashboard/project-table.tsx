@@ -220,21 +220,27 @@ function SubTaskPanel({
 
   return (
     <div className="bg-muted/40 p-4">
-      <div className="grid w-full grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {TASK_GROUPS.map((group) => (
-          <GroupCard
-            key={group}
-            title={group}
-            groupTasks={tasks
-              .filter((t) => t.group === group)
-              .toSorted(byDeadline)}
-            project={project}
-            allTasks={tasks}
-            onTaskUpdate={onTaskUpdate}
-            onEditTask={onEditTask}
-            onAddTask={onAddTask}
-          />
-        ))}
+      {/* All pipeline categories on one row. They never wrap; the row scrolls
+          horizontally instead, and each column keeps a usable min width so the
+          task cards don't get squished on narrow screens. */}
+      <div className="scrollbar-subtle overflow-x-auto">
+        <div className="flex w-full flex-nowrap items-start gap-6">
+          {TASK_GROUPS.map((group) => (
+            <div key={group} className="min-w-[320px] flex-1">
+              <GroupCard
+                title={group}
+                groupTasks={tasks
+                  .filter((t) => t.group === group)
+                  .toSorted(byDeadline)}
+                project={project}
+                allTasks={tasks}
+                onTaskUpdate={onTaskUpdate}
+                onEditTask={onEditTask}
+                onAddTask={onAddTask}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
