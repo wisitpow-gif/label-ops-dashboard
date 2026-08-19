@@ -3,9 +3,18 @@
 
 export type TaskStatus = "Not Start" | "WIP" | "Done" | "Blocked";
 
-export type TaskGroup = "Digital Distribution Pack" | "TEASER & MV";
+export type TaskGroup =
+  | "Demo"
+  | "Digital Distribution Pack"
+  | "TEASER & MV"
+  | "Online Content";
 
-export type ProjectType = "Single" | "Album" | "Live Session" | "Other";
+export type ProjectType =
+  | "Single"
+  | "Album"
+  | "Live Session"
+  | "Concert"
+  | "Other";
 
 export type WorkType = "Release" | "Internal";
 

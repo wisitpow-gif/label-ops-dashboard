@@ -40,10 +40,22 @@ const thaiFull = new Intl.DateTimeFormat("th-TH", {
   year: "numeric",
 });
 
+// Weekday + full month + Buddhist year, e.g. "วันพุธที่ 19 สิงหาคม 2569".
+const thaiLong = new Intl.DateTimeFormat("th-TH", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
 export function formatShort(date: Date): string {
   return thaiShort.format(date);
 }
 
 export function formatFull(date: Date): string {
   return thaiFull.format(date);
+}
+
+export function formatLongDate(date: Date): string {
+  return thaiLong.format(date);
 }

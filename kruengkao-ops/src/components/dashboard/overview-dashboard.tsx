@@ -2,23 +2,21 @@
 
 import * as React from "react";
 import {
-  AlertTriangle,
   CalendarClock,
   CalendarDays,
   CircleUser,
   FolderKanban,
+  ListChecks,
   Rocket,
   TriangleAlert,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   addDays,
-  diffDays,
+  formatLongDate,
   formatShort,
   parseDate,
   startOfToday,
@@ -33,14 +31,6 @@ interface EnrichedTask {
   project: Project;
   deadline: Date;
   deadlineIso: string;
-}
-
-/** Human relative-deadline label (Thai). */
-function relLabel(daysFromToday: number): string {
-  if (daysFromToday < 0) return `เกิน ${-daysFromToday} วัน`;
-  if (daysFromToday === 0) return "วันนี้";
-  if (daysFromToday === 1) return "พรุ่งนี้";
-  return `อีก ${daysFromToday} วัน`;
 }
 
 function StatTile({
@@ -100,6 +90,7 @@ export function OverviewDashboard({
     return m;
   }, [projects]);
 
+  // Every schedulable task (any project, any owner) with its resolved deadline.
   const enriched = React.useMemo(() => {
     const out: EnrichedTask[] = [];
     for (const t of tasks) {
@@ -112,60 +103,42 @@ export function OverviewDashboard({
     return out;
   }, [tasks, projectById]);
 
-  // --- Global project health -------------------------------------------------
-  const activeProjects = React.useMemo(() => {
-    const iso = toISODate(startOfToday());
-    return projects
-      .map((project) => {
-        const pts = tasks.filter((t) => t.projectId === project.id);
-        const done = pts.filter((t) => t.status === "Done").length;
+  // --- Global task triage (company-wide: ALL projects, ALL people) -----------
+  const allActive = React.useMemo(
+    () =>
+      enriched
+        .filter((e) => e.task.status !== "Done")
+        .toSorted((a, b) => a.deadlineIso.localeCompare(b.deadlineIso)),
+    [enriched]
+  );
+
+  const globalOverdue = allActive.filter((e) => e.deadlineIso < todayIso);
+  const globalToday = allActive.filter((e) => e.deadlineIso === todayIso);
+  const globalUpcoming = allActive.filter((e) => e.deadlineIso > todayIso);
+
+  // --- KPI figures -----------------------------------------------------------
+  // Active = not every task done (0-task projects count as active too).
+  const activeProjectCount = React.useMemo(
+    () =>
+      projects.filter((p) => {
+        const pts = tasks.filter((t) => t.projectId === p.id);
         const total = pts.length;
-        const notDone = pts
-          .filter((t) => t.status !== "Done")
-          .map((t) => ({ t, d: taskDeadline(t, project) }))
-          .toSorted((a, b) => a.d.getTime() - b.d.getTime());
-        return {
-          project,
-          done,
-          total,
-          pct: total ? Math.round((done / total) * 100) : 0,
-          allDone: total > 0 && done === total,
-          nextTask: notDone[0]?.t ?? null,
-          overdue: pts.filter(
-            (t) =>
-              t.status !== "Done" &&
-              toISODate(taskDeadline(t, project)) < iso
-          ).length,
-        };
-      })
-      .filter((x) => !x.allDone)
-      .toSorted((a, b) =>
-        a.project.releaseDate.localeCompare(b.project.releaseDate)
-      );
-  }, [projects, tasks]);
+        const done = pts.filter((t) => t.status === "Done").length;
+        return !(total > 0 && done === total);
+      }).length,
+    [projects, tasks]
+  );
 
-  const critical = React.useMemo(() => {
-    const cutoff = addDays(startOfToday(), 2);
-    return enriched
-      .filter((e) => e.task.status !== "Done" && e.deadline <= cutoff)
-      .toSorted((a, b) => a.deadlineIso.localeCompare(b.deadlineIso));
-  }, [enriched]);
-
-  const upcomingReleases = React.useMemo(() => {
+  const nextRelease = React.useMemo(() => {
     const iso = toISODate(startOfToday());
     return projects
       .filter((p) => p.releaseDate && p.releaseDate >= iso)
-      .toSorted((a, b) => a.releaseDate.localeCompare(b.releaseDate));
+      .toSorted((a, b) => a.releaseDate.localeCompare(b.releaseDate))[0];
   }, [projects]);
 
-  const overdueCount = enriched.filter(
-    (e) => e.task.status !== "Done" && e.deadlineIso < todayIso
-  ).length;
-  const dueSoonCount = enriched.filter(
-    (e) =>
-      e.task.status !== "Done" &&
-      e.deadlineIso >= todayIso &&
-      e.deadline <= soonCutoff
+  const overdueCount = globalOverdue.length;
+  const dueSoonCount = allActive.filter(
+    (e) => e.deadlineIso >= todayIso && e.deadline <= soonCutoff
   ).length;
 
   // --- Personal workspace ----------------------------------------------------
@@ -181,40 +154,56 @@ export function OverviewDashboard({
   const myUpcoming = mine.filter((e) => e.deadlineIso > todayIso);
 
   // --- Render helpers --------------------------------------------------------
-  const criticalRow = (e: EnrichedTask) => {
-    const days = diffDays(today, e.deadline);
-    const overdue = e.deadlineIso < todayIso;
-    return (
-      <button
-        key={e.task.id}
-        type="button"
-        onClick={() => onEditTask(e.task)}
-        className="flex w-full items-center gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-muted/50"
-      >
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-            overdue
-              ? "bg-red-500/15 text-red-700 dark:text-red-400"
-              : "bg-amber-500/15 text-amber-700 dark:text-amber-500"
-          )}
-        >
-          {relLabel(days)}
+  /** Assignee chip — avatar + name, prominent so triage shows who holds it. */
+  const assignee = (person: string) =>
+    person ? (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <Avatar className="size-6">
+          <AvatarFallback className="text-[10px]">
+            {initialsOf(person)}
+          </AvatarFallback>
+        </Avatar>
+        <span className="truncate text-xs font-medium">{person}</span>
+      </span>
+    ) : (
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        <span className="flex size-6 items-center justify-center rounded-full border border-dashed text-[10px]">
+          ?
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{e.task.name}</div>
-          <div className="truncate text-xs text-muted-foreground">
-            {e.project.songName}
-            {e.task.person ? ` · ${e.task.person}` : ""}
-          </div>
-        </div>
+        <span className="text-xs">ยังไม่มอบหมาย</span>
+      </span>
+    );
+
+  /** Company-wide triage card — leads with assignee visibility. */
+  const triageCard = (e: EnrichedTask) => (
+    <div key={e.task.id} className="rounded-lg border bg-background p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onEditTask(e.task)}
+          className="min-w-0 text-left text-sm font-medium leading-snug hover:underline"
+        >
+          {e.task.name}
+        </button>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {formatShort(e.deadline)}
         </span>
-      </button>
-    );
-  };
+      </div>
+      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+        {e.project.songName} · {e.project.artistName}
+        {e.project.label ? ` · ${e.project.label}` : ""}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {assignee(e.task.person)}
+        <StatusSelect
+          value={e.task.status}
+          onChange={(status) => onTaskUpdate(e.task.id, { status })}
+        />
+      </div>
+    </div>
+  );
 
+  /** Personal card — the owner is implicit (it's you), so no assignee chip. */
   const myTaskCard = (e: EnrichedTask) => (
     <div key={e.task.id} className="rounded-lg border bg-background p-2.5">
       <div className="flex items-start justify-between gap-2">
@@ -230,7 +219,8 @@ export function OverviewDashboard({
         </span>
       </div>
       <div className="mt-0.5 truncate text-xs text-muted-foreground">
-        {e.project.songName} · {e.project.label}
+        {e.project.songName} · {e.project.artistName}
+        {e.project.label ? ` · ${e.project.label}` : ""}
       </div>
       <div className="mt-2">
         <StatusSelect
@@ -244,7 +234,8 @@ export function OverviewDashboard({
   const bucket = (
     title: string,
     items: EnrichedTask[],
-    tone: "red" | "amber" | "default"
+    tone: "red" | "amber" | "default",
+    renderItem: (e: EnrichedTask) => React.ReactNode
   ) => {
     const dot = {
       red: "bg-red-500",
@@ -266,7 +257,7 @@ export function OverviewDashboard({
               ไม่มีงาน
             </p>
           ) : (
-            items.map(myTaskCard)
+            items.map(renderItem)
           )}
         </div>
       </div>
@@ -275,7 +266,64 @@ export function OverviewDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Personal workspace (My Tasks) — top priority for daily focus */}
+      {/* 1. Current date — anchors the daily triage workflow */}
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <CalendarDays className="size-5" />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">วันนี้</p>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            {formatLongDate(today)}
+          </h1>
+        </div>
+      </div>
+
+      {/* 2. Global Task Triage — company-wide, assignee-forward */}
+      <section className="space-y-3">
+        <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold">
+          <ListChecks className="size-4 text-muted-foreground" />
+          Global Task Triage
+          <span className="text-sm font-normal text-muted-foreground">
+            · ทุกโปรเจกต์ / ทุกคน
+          </span>
+        </h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          {bucket("Overdue", globalOverdue, "red", triageCard)}
+          {bucket("Due Today", globalToday, "amber", triageCard)}
+          {bucket("Upcoming", globalUpcoming, "default", triageCard)}
+        </div>
+      </section>
+
+      {/* 3. KPI summary tiles — visual divider */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          icon={<FolderKanban className="size-5" />}
+          label="โปรเจกต์ที่กำลังทำ"
+          value={activeProjectCount}
+        />
+        <StatTile
+          icon={<TriangleAlert className="size-5" />}
+          label="งานเกินกำหนด"
+          value={overdueCount}
+          tone={overdueCount > 0 ? "red" : "default"}
+        />
+        <StatTile
+          icon={<CalendarClock className="size-5" />}
+          label="ครบกำหนดใน 48 ชม."
+          value={dueSoonCount}
+          tone={dueSoonCount > 0 ? "amber" : "default"}
+        />
+        <StatTile
+          icon={<Rocket className="size-5" />}
+          label="ปล่อยเพลงถัดไป"
+          value={
+            nextRelease ? formatShort(parseDate(nextRelease.releaseDate)) : "—"
+          }
+        />
+      </div>
+
+      {/* 4. My Tasks — personal view for the logged-in member */}
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-base font-semibold">
           <CircleUser className="size-4 text-muted-foreground" />
@@ -299,192 +347,11 @@ export function OverviewDashboard({
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
-            {bucket("Overdue", myOverdue, "red")}
-            {bucket("Due Today", myToday, "amber")}
-            {bucket("Upcoming", myUpcoming, "default")}
+            {bucket("Overdue", myOverdue, "red", myTaskCard)}
+            {bucket("Due Today", myToday, "amber", myTaskCard)}
+            {bucket("Upcoming", myUpcoming, "default", myTaskCard)}
           </div>
         )}
-      </section>
-
-      {/* KPI tiles */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          icon={<FolderKanban className="size-5" />}
-          label="โปรเจกต์ที่กำลังทำ"
-          value={activeProjects.length}
-        />
-        <StatTile
-          icon={<TriangleAlert className="size-5" />}
-          label="งานเกินกำหนด"
-          value={overdueCount}
-          tone={overdueCount > 0 ? "red" : "default"}
-        />
-        <StatTile
-          icon={<CalendarClock className="size-5" />}
-          label="ครบกำหนดใน 48 ชม."
-          value={dueSoonCount}
-          tone={dueSoonCount > 0 ? "amber" : "default"}
-        />
-        <StatTile
-          icon={<Rocket className="size-5" />}
-          label="ปล่อยเพลงถัดไป"
-          value={
-            upcomingReleases[0]
-              ? formatShort(parseDate(upcomingReleases[0].releaseDate))
-              : "—"
-          }
-        />
-      </div>
-
-      {/* Global project health */}
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <FolderKanban className="size-4 text-muted-foreground" />
-          Global Project Health
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {/* Active projects */}
-          <div className="space-y-2 lg:col-span-2">
-            {activeProjects.length === 0 ? (
-              <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                ไม่มีโปรเจกต์ที่กำลังดำเนินการ
-              </div>
-            ) : (
-              activeProjects.map(
-                ({ project, done, total, pct, nextTask, overdue }) => {
-                  const days = diffDays(today, parseDate(project.releaseDate));
-                  return (
-                    <div
-                      key={project.id}
-                      className="rounded-xl border p-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold">
-                            {project.songName}
-                          </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {project.artistName} · {project.label}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <div className="flex items-center gap-1 text-xs font-medium">
-                            <CalendarDays className="size-3.5 text-muted-foreground" />
-                            {formatShort(parseDate(project.releaseDate))}
-                          </div>
-                          <div
-                            className={cn(
-                              "text-[11px]",
-                              days < 0
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-muted-foreground"
-                            )}
-                          >
-                            {relLabel(days)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Progress value={pct} className="h-1.5 flex-1" />
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          {done}/{total}
-                        </span>
-                      </div>
-                      <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        {overdue > 0 && (
-                          <Badge className="border-transparent bg-red-500/15 text-red-700 dark:text-red-400">
-                            {overdue} เกินกำหนด
-                          </Badge>
-                        )}
-                        {nextTask && (
-                          <span className="truncate">
-                            ถัดไป: {nextTask.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-              )
-            )}
-          </div>
-
-          {/* Right rail: critical + upcoming */}
-          <div className="space-y-4">
-            <Card className="gap-0 py-0">
-              <CardHeader className="gap-0 border-b px-3 py-2.5">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <AlertTriangle className="size-4 text-red-500" />
-                  Critical / Urgent
-                  <span className="ml-auto rounded-full bg-muted px-2 text-xs tabular-nums text-muted-foreground">
-                    {critical.length}
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 p-2">
-                {critical.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-muted-foreground">
-                    ไม่มีงานเร่งด่วน 🎉
-                  </p>
-                ) : (
-                  <>
-                    {critical.slice(0, 8).map(criticalRow)}
-                    {critical.length > 8 && (
-                      <p className="px-1 text-[11px] text-muted-foreground">
-                        +{critical.length - 8} งานเพิ่มเติม
-                      </p>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="gap-0 py-0">
-              <CardHeader className="gap-0 border-b px-3 py-2.5">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Rocket className="size-4 text-muted-foreground" />
-                  Upcoming Releases
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2">
-                {upcomingReleases.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-muted-foreground">
-                    ไม่มีกำหนดปล่อยเพลง
-                  </p>
-                ) : (
-                  <ul className="divide-y">
-                    {upcomingReleases.slice(0, 6).map((p) => {
-                      const days = diffDays(today, parseDate(p.releaseDate));
-                      return (
-                        <li
-                          key={p.id}
-                          className="flex items-center gap-2 px-1 py-2"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium">
-                              {p.songName}
-                            </div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {p.artistName} · {p.label}
-                            </div>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <div className="text-xs font-medium tabular-nums">
-                              {formatShort(parseDate(p.releaseDate))}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {relLabel(days)}
-                            </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
       </section>
     </div>
   );

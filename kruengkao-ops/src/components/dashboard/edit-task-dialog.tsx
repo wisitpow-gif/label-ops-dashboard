@@ -33,7 +33,7 @@ export interface EditTaskPatch {
 }
 
 /** Labeled date picker used for both Start and End. */
-function DateField({
+export function DateField({
   label,
   value,
   onChange,
