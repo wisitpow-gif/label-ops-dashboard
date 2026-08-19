@@ -939,6 +939,13 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
   return (data as TaskCommentRow[]).map(mapTaskComment);
 }
 
+/** Result of a comment insert — returns the error as DATA so the real message
+ *  survives to the client (thrown Server Action errors are redacted in
+ *  deployed builds). */
+export type CreateTaskCommentResult =
+  | { ok: true; comment: TaskComment }
+  | { ok: false; error: string };
+
 /**
  * Post a comment. The author is resolved from the signed-in user's email →
  * team member (author_id); author_name is denormalized for display and falls
@@ -947,26 +954,35 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
 export async function createTaskComment(
   taskId: string,
   content: string
-): Promise<TaskComment> {
+): Promise<CreateTaskCommentResult> {
   const body = content.trim();
-  if (!body) throw new Error("ความคิดเห็นว่างเปล่า");
+  if (!body) return { ok: false, error: "ความคิดเห็นว่างเปล่า" };
 
   const supabase = await createClient();
 
   const {
     data: { user },
+    error: authErr,
   } = await supabase.auth.getUser();
-  const email = user?.email?.toLowerCase() ?? null;
+  if (authErr || !user) {
+    console.error("[createTaskComment] no authenticated user:", authErr);
+    return { ok: false, error: "ไม่พบเซสชันผู้ใช้ (unauthenticated)" };
+  }
+  const email = user.email?.toLowerCase() ?? null;
 
   let authorId: string | null = null;
   let authorName = email ? email.split("@")[0] : "ไม่ทราบชื่อ";
   if (email) {
-    const { data: member } = await supabase
+    const { data: member, error: memberErr } = await supabase
       .from("team_members")
       .select("id, name")
       .eq("email", email)
       .limit(1)
       .maybeSingle();
+    if (memberErr) {
+      // Non-fatal — fall back to the email local part below.
+      console.error("[createTaskComment] member lookup failed:", memberErr);
+    }
     if (member) {
       authorId = (member as { id: string }).id;
       authorName = (member as { name: string }).name;
@@ -985,7 +1001,12 @@ export async function createTaskComment(
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Failed to post comment");
+    // Surfaces in the Vercel Function/Runtime logs for this deployment.
+    console.error("[createTaskComment] insert failed:", error);
+    return {
+      ok: false,
+      error: error?.message ?? "insert returned no row",
+    };
   }
-  return mapTaskComment(data as TaskCommentRow);
+  return { ok: true, comment: mapTaskComment(data as TaskCommentRow) };
 }

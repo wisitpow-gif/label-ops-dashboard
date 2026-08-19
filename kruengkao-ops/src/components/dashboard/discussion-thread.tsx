@@ -47,7 +47,9 @@ export function DiscussionThread({
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        // A missing table / wrong DB / RLS read block shows up here.
+        console.error("[DiscussionThread] getTaskComments failed:", err);
         if (active) setLoading(false);
       });
     return () => {
@@ -78,12 +80,24 @@ export function DiscussionThread({
     setText("");
     setSending(true);
 
-    try {
-      const saved = await createTaskComment(taskId, content);
-      setComments((prev) => prev.map((c) => (c.id === tempId ? saved : c)));
-    } catch {
+    const rollback = () => {
       setComments((prev) => prev.filter((c) => c.id !== tempId));
       setText(content); // restore the draft so it isn't lost
+    };
+
+    try {
+      const res = await createTaskComment(taskId, content);
+      if (!res.ok) {
+        // Real DB/RLS message, returned as data (see createTaskComment).
+        console.error("[DiscussionThread] createTaskComment failed:", res.error);
+        rollback();
+        toast.error(res.error || "ส่งข้อความไม่สำเร็จ — ลองอีกครั้ง");
+        return;
+      }
+      setComments((prev) => prev.map((c) => (c.id === tempId ? res.comment : c)));
+    } catch (err) {
+      console.error("[DiscussionThread] createTaskComment threw:", err);
+      rollback();
       toast.error("ส่งข้อความไม่สำเร็จ — ลองอีกครั้ง");
     } finally {
       setSending(false);
