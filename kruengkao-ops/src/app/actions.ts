@@ -39,7 +39,7 @@ const ASSET_COLS =
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
 const EXPENSE_COLS =
-  "id, project_id, expense_group, description, payee_name, payee_type, budgeted_amount, actual_amount, payment_note, evidence_url, is_recoupable, created_at";
+  "id, project_id, expense_group, description, payee_name, payee_type, budgeted_amount, actual_amount, verified_amount, payment_note, evidence_url, is_recoupable, created_at";
 const TASK_COLS =
   "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, start_date, end_date, blocked_by";
 const TEMPLATE_COLS =
@@ -1105,6 +1105,7 @@ export interface UpdateExpenseInput {
   payeeName?: string;
   budgetedAmount?: number;
   actualAmount?: number;
+  verifiedAmount?: number;
   paymentNote?: string | null;
   evidenceUrl?: string | null;
   isRecoupable?: boolean;
@@ -1125,6 +1126,8 @@ export async function updateProjectExpense(
     payload.budgeted_amount = patch.budgetedAmount;
   if (patch.actualAmount !== undefined)
     payload.actual_amount = patch.actualAmount;
+  if (patch.verifiedAmount !== undefined)
+    payload.verified_amount = patch.verifiedAmount;
   if (patch.paymentNote !== undefined)
     payload.payment_note = patch.paymentNote || null;
   if (patch.evidenceUrl !== undefined)

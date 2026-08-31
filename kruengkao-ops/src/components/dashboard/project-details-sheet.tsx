@@ -185,7 +185,9 @@ function ProductionExpensesSection({
 
   const totalBudget = expenses.reduce((a, e) => a + e.budgetedAmount, 0);
   const totalActual = expenses.reduce((a, e) => a + e.actualAmount, 0);
-  const variance = totalBudget - totalActual;
+  const totalVerified = expenses.reduce((a, e) => a + e.verifiedAmount, 0);
+  // Variance against the final settled truth (Accounting-verified).
+  const variance = totalBudget - totalVerified;
 
   return (
     <section className="space-y-3">
@@ -204,8 +206,9 @@ function ProductionExpensesSection({
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead className="min-w-60">Description</TableHead>
               <TableHead className="min-w-52">Payee</TableHead>
-              <TableHead className="w-28 text-right">Budgeted</TableHead>
-              <TableHead className="w-28 text-right">Actual</TableHead>
+              <TableHead className="w-28 text-right">Budget</TableHead>
+              <TableHead className="w-32 text-right">ใช้จริง (Producer)</TableHead>
+              <TableHead className="w-32 text-right">เกิดจริง (Account)</TableHead>
               <TableHead className="w-48">Evidence Link</TableHead>
               <TableHead className="w-16 text-center">Recoup?</TableHead>
               <TableHead className="w-10" />
@@ -215,9 +218,10 @@ function ProductionExpensesSection({
             {grouped.map(({ group, rows }) => {
               const gBudget = rows.reduce((a, e) => a + e.budgetedAmount, 0);
               const gActual = rows.reduce((a, e) => a + e.actualAmount, 0);
+              const gVerified = rows.reduce((a, e) => a + e.verifiedAmount, 0);
               return (
                 <React.Fragment key={group}>
-                  {/* Group header + subtotal + add-within-group */}
+                  {/* Group header + subtotals + add-within-group */}
                   <TableRow className="border-t-2 bg-muted/40 hover:bg-muted/40">
                     <TableCell colSpan={2} className="py-2 font-semibold">
                       {group}
@@ -227,6 +231,9 @@ function ProductionExpensesSection({
                     </TableCell>
                     <TableCell className="py-2 text-right text-xs tabular-nums text-muted-foreground">
                       {thb.format(gActual)}
+                    </TableCell>
+                    <TableCell className="py-2 text-right text-xs tabular-nums text-muted-foreground">
+                      {thb.format(gVerified)}
                     </TableCell>
                     <TableCell colSpan={3} className="py-1.5">
                       <Button
@@ -320,6 +327,26 @@ function ProductionExpensesSection({
                         />
                       </TableCell>
                       <TableCell className="p-2 align-top">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="text-right tabular-nums"
+                          value={e.verifiedAmount}
+                          onFocus={(ev) => ev.target.select()}
+                          onChange={(ev) =>
+                            patchLocal(e.id, {
+                              verifiedAmount: toNum(ev.target.value),
+                            })
+                          }
+                          onBlur={(ev) =>
+                            commit(e.id, {
+                              verifiedAmount: toNum(ev.target.value),
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
                         <div className="flex items-center gap-1">
                           <Input
                             placeholder="ลิงก์ใบเสร็จ/หลักฐาน"
@@ -383,18 +410,28 @@ function ProductionExpensesSection({
         </Table>
       </div>
 
-      {/* Grand totals + variance */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {/* Grand totals + variance (Maker vs Checker) */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="rounded-lg border px-3 py-2">
-          <div className="text-xs text-muted-foreground">Total Budgeted</div>
+          <div className="text-xs text-muted-foreground">Total Budget</div>
           <div className="text-sm font-semibold tabular-nums">
             {thb.format(totalBudget)}
           </div>
         </div>
         <div className="rounded-lg border px-3 py-2">
-          <div className="text-xs text-muted-foreground">Total Actual</div>
+          <div className="text-xs text-muted-foreground">
+            รวมใช้จริง (Producer)
+          </div>
           <div className="text-sm font-semibold tabular-nums">
             {thb.format(totalActual)}
+          </div>
+        </div>
+        <div className="rounded-lg border px-3 py-2">
+          <div className="text-xs text-muted-foreground">
+            รวมเกิดจริง (Account)
+          </div>
+          <div className="text-sm font-semibold tabular-nums">
+            {thb.format(totalVerified)}
           </div>
         </div>
         <div
@@ -406,7 +443,7 @@ function ProductionExpensesSection({
           )}
         >
           <div className="text-xs text-muted-foreground">
-            Variance (Budget − Actual)
+            Variance (Budget − เกิดจริง)
           </div>
           <div
             className={cn(
@@ -662,12 +699,12 @@ function FinanceTab({ project }: { project: Project }) {
       `Project,${project.songName},${project.artistName},${project.label}`,
       "",
       "PRODUCTION EXPENSES",
-      "Group,Description,Payee,Budgeted,Actual,Recoupable,Evidence",
+      "Group,Description,Payee,Budget,Actual (Producer),Verified (Account),Recoupable,Evidence",
       ...expenses.map(
         (e) =>
-          `"${e.expenseGroup}","${e.description}","${e.payeeName}",${e.budgetedAmount.toFixed(2)},${e.actualAmount.toFixed(2)},${e.isRecoupable ? "Yes" : "No"},"${e.evidenceUrl ?? ""}"`
+          `"${e.expenseGroup}","${e.description}","${e.payeeName}",${e.budgetedAmount.toFixed(2)},${e.actualAmount.toFixed(2)},${e.verifiedAmount.toFixed(2)},${e.isRecoupable ? "Yes" : "No"},"${e.evidenceUrl ?? ""}"`
       ),
-      `,,Total,${expenses.reduce((a, e) => a + e.budgetedAmount, 0).toFixed(2)},${expenses.reduce((a, e) => a + e.actualAmount, 0).toFixed(2)},,`,
+      `,,Total,${expenses.reduce((a, e) => a + e.budgetedAmount, 0).toFixed(2)},${expenses.reduce((a, e) => a + e.actualAmount, 0).toFixed(2)},${expenses.reduce((a, e) => a + e.verifiedAmount, 0).toFixed(2)},,`,
       "",
       "ROYALTY SPLITS",
       "Role,Payee Type,Name,Percentage,Note",

@@ -234,8 +234,9 @@ create table public.production_expenses (
   payee_type      text not null default 'Individual'
                     check (payee_type in ('Individual', 'Company', 'Band')),
   payee_name      text not null default '',
-  budgeted_amount numeric(12, 2) not null default 0,
-  actual_amount   numeric(12, 2) not null default 0,
+  budgeted_amount numeric(12, 2) not null default 0,   -- step 1: Budget
+  actual_amount   numeric(12, 2) not null default 0,   -- step 2: ใช้จริง (Producer)
+  verified_amount numeric(12, 2) not null default 0,   -- step 3: เกิดจริง (Account)
   payment_note    text,
   evidence_url    text,
   is_recoupable   boolean not null default true,

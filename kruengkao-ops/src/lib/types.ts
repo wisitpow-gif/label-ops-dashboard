@@ -139,8 +139,12 @@ export interface ProductionExpense {
   description: string;
   payeeName: string;
   payeeType: PayeeType;
+  /** Step 1 — planned budget. */
   budgetedAmount: number;
+  /** Step 2 — ใช้จริง, recorded by the Producer. */
   actualAmount: number;
+  /** Step 3 — เกิดจริง, confirmed by Accounting after verifying evidence. */
+  verifiedAmount: number;
   paymentNote?: string;
   /** Link/path to a receipt or payment evidence. */
   evidenceUrl?: string;

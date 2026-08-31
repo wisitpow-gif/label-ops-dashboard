@@ -148,6 +148,7 @@ export interface ProductionExpenseRow {
   payee_type: string;
   budgeted_amount: number | string;
   actual_amount: number | string;
+  verified_amount: number | string;
   payment_note: string | null;
   evidence_url: string | null;
   is_recoupable: boolean;
@@ -167,6 +168,7 @@ export function mapProductionExpense(
     // numeric(12,2) can arrive as a string from PostgREST — coerce to number.
     budgetedAmount: Number(row.budgeted_amount) || 0,
     actualAmount: Number(row.actual_amount) || 0,
+    verifiedAmount: Number(row.verified_amount) || 0,
     paymentNote: row.payment_note ?? undefined,
     evidenceUrl: row.evidence_url ?? undefined,
     isRecoupable: row.is_recoupable,
