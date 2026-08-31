@@ -202,11 +202,11 @@ function ProductionExpensesSection({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="min-w-56">Description</TableHead>
-              <TableHead className="w-36">Payee</TableHead>
+              <TableHead className="min-w-60">Description</TableHead>
+              <TableHead className="min-w-52">Payee</TableHead>
               <TableHead className="w-28 text-right">Budgeted</TableHead>
               <TableHead className="w-28 text-right">Actual</TableHead>
-              <TableHead className="w-44">Evidence Link</TableHead>
+              <TableHead className="w-48">Evidence Link</TableHead>
               <TableHead className="w-16 text-center">Recoup?</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -254,29 +254,32 @@ function ProductionExpensesSection({
                             commit(e.id, { description: ev.target.value })
                           }
                         />
-                        <Input
-                          placeholder="payment note (งวด/เงื่อนไข)"
-                          value={e.paymentNote ?? ""}
-                          onChange={(ev) =>
-                            patchLocal(e.id, { paymentNote: ev.target.value })
-                          }
-                          onBlur={(ev) =>
-                            commit(e.id, { paymentNote: ev.target.value })
-                          }
-                          className="mt-1 h-7 text-xs text-muted-foreground"
-                        />
                       </TableCell>
                       <TableCell className="p-2 align-top">
-                        <Input
-                          placeholder="ผู้รับเงิน"
-                          value={e.payeeName}
-                          onChange={(ev) =>
-                            patchLocal(e.id, { payeeName: ev.target.value })
-                          }
-                          onBlur={(ev) =>
-                            commit(e.id, { payeeName: ev.target.value })
-                          }
-                        />
+                        {/* Payee + payment note stacked so they never overlap */}
+                        <div className="flex flex-col gap-1.5">
+                          <Input
+                            placeholder="ผู้รับเงิน"
+                            value={e.payeeName}
+                            onChange={(ev) =>
+                              patchLocal(e.id, { payeeName: ev.target.value })
+                            }
+                            onBlur={(ev) =>
+                              commit(e.id, { payeeName: ev.target.value })
+                            }
+                          />
+                          <Input
+                            placeholder="payment note (งวด/เงื่อนไข)"
+                            value={e.paymentNote ?? ""}
+                            onChange={(ev) =>
+                              patchLocal(e.id, { paymentNote: ev.target.value })
+                            }
+                            onBlur={(ev) =>
+                              commit(e.id, { paymentNote: ev.target.value })
+                            }
+                            className="h-7 text-xs text-muted-foreground"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="p-2 align-top">
                         <Input
