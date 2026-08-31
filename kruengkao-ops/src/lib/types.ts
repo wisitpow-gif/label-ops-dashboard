@@ -130,6 +130,24 @@ export interface ExpenseEntry {
   isRecoupable: boolean;
 }
 
+/** A persisted production_expenses row — Budget vs Actual, grouped by CBS. */
+export interface ProductionExpense {
+  id: string;
+  projectId: string;
+  /** CBS group, e.g. "AUDIO MASTER" / "Music Video" ("" if ungrouped). */
+  expenseGroup: string;
+  description: string;
+  payeeName: string;
+  payeeType: PayeeType;
+  budgetedAmount: number;
+  actualAmount: number;
+  paymentNote?: string;
+  /** Link/path to a receipt or payment evidence. */
+  evidenceUrl?: string;
+  isRecoupable: boolean;
+  createdAt: string;
+}
+
 /** One royalty split row (maps to SONG_SPLITS) */
 export interface SplitEntry {
   id: string;

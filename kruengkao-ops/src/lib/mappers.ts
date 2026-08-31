@@ -1,4 +1,6 @@
 import type {
+  PayeeType,
+  ProductionExpense,
   Project,
   ProjectAsset,
   ProjectType,
@@ -134,6 +136,41 @@ export function mapTaskDependency(row: TaskDependencyRow): TaskDependency {
     id: row.id,
     taskId: row.task_id,
     dependsOnTaskId: row.depends_on_task_id,
+  };
+}
+
+export interface ProductionExpenseRow {
+  id: string;
+  project_id: string;
+  expense_group: string | null;
+  description: string;
+  payee_name: string;
+  payee_type: string;
+  budgeted_amount: number | string;
+  actual_amount: number | string;
+  payment_note: string | null;
+  evidence_url: string | null;
+  is_recoupable: boolean;
+  created_at: string;
+}
+
+export function mapProductionExpense(
+  row: ProductionExpenseRow
+): ProductionExpense {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    expenseGroup: row.expense_group ?? "",
+    description: row.description,
+    payeeName: row.payee_name,
+    payeeType: row.payee_type as PayeeType,
+    // numeric(12,2) can arrive as a string from PostgREST — coerce to number.
+    budgetedAmount: Number(row.budgeted_amount) || 0,
+    actualAmount: Number(row.actual_amount) || 0,
+    paymentNote: row.payment_note ?? undefined,
+    evidenceUrl: row.evidence_url ?? undefined,
+    isRecoupable: row.is_recoupable,
+    createdAt: row.created_at,
   };
 }
 
