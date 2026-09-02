@@ -34,6 +34,19 @@ export interface TaskDependency {
   dependsOnTaskId: string;
 }
 
+/** One message in a task's discussion thread. */
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  /** team_members.id of the author (null if the user isn't a linked member). */
+  authorId?: string;
+  /** Denormalized display name — rendered directly, no join needed. */
+  authorName: string;
+  content: string;
+  /** ISO timestamp. */
+  createdAt: string;
+}
+
 // --- DAM: Digital Asset Management (Quick Drop → verify → official → backup) ---
 
 /** One row of project_assets — a submitted file tracked across cloud + local. */
@@ -115,6 +128,28 @@ export interface ExpenseEntry {
   /** Kept as string for free typing; parsed for totals */
   amount: string;
   isRecoupable: boolean;
+}
+
+/** A persisted production_expenses row — Budget vs Actual, grouped by CBS. */
+export interface ProductionExpense {
+  id: string;
+  projectId: string;
+  /** CBS group, e.g. "AUDIO MASTER" / "Music Video" ("" if ungrouped). */
+  expenseGroup: string;
+  description: string;
+  payeeName: string;
+  payeeType: PayeeType;
+  /** Step 1 — planned budget. */
+  budgetedAmount: number;
+  /** Step 2 — ใช้จริง, recorded by the Producer. */
+  actualAmount: number;
+  /** Step 3 — เกิดจริง, confirmed by Accounting after verifying evidence. */
+  verifiedAmount: number;
+  paymentNote?: string;
+  /** Link/path to a receipt or payment evidence. */
+  evidenceUrl?: string;
+  isRecoupable: boolean;
+  createdAt: string;
 }
 
 /** One royalty split row (maps to SONG_SPLITS) */

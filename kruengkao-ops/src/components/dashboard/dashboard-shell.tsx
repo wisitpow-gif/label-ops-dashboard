@@ -506,6 +506,7 @@ export function DashboardShell({
               if (!open) setEditTask(null);
             }}
             onSave={handleTaskEdit}
+            currentAuthor={currentPerson ?? userEmail ?? "ฉัน"}
           />
         )}
       </div>

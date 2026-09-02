@@ -76,6 +76,18 @@ export const TEMPLATE_CATEGORIES = [
   "Online Content",
 ] as const;
 
+// Canonical CBS group order for the Finance → Production Expenses table.
+// Groups present in the data but not listed here render last (alphabetical).
+export const EXPENSE_GROUP_ORDER = [
+  "AUDIO MASTER",
+  "Music Video",
+  "Key Visual",
+  "Promo Materials",
+  "Other",
+] as const;
+
+export const UNGROUPED_EXPENSE = "Ungrouped";
+
 // Asset categories for the Digital Library "Quick Drop" + grouping.
 export const ASSET_CATEGORIES = [
   "Master Audio",

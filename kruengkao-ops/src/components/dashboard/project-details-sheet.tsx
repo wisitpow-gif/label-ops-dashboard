@@ -5,11 +5,13 @@ import {
   CalendarDays,
   CircleCheck,
   Download,
+  ExternalLink,
   Plus,
   Trash2,
   TriangleAlert,
   UserPlus,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { formatFull, parseDate } from "@/lib/dates";
+import { EXPENSE_GROUP_ORDER, UNGROUPED_EXPENSE } from "@/lib/constants";
 import {
   SPLIT_ROLES,
   TASK_GROUPS,
@@ -48,12 +51,19 @@ import {
   packStatus,
 } from "@/lib/mock-data";
 import type {
-  ExpenseEntry,
   PayeeType,
+  ProductionExpense,
   Project,
   SplitEntry,
   Task,
 } from "@/lib/types";
+import {
+  createProjectExpense,
+  deleteProjectExpense,
+  listProjectExpenses,
+  updateProjectExpense,
+  type UpdateExpenseInput,
+} from "@/app/actions";
 import { StatusBadge } from "./status-badge";
 
 const thb = new Intl.NumberFormat("th-TH", {
@@ -98,147 +108,354 @@ function PayeeTypeSelect({
 }
 
 // ---------------------------------------------------------------------------
-// Section 1: Production Expenses (Recoupable Ledger)
+// Section 1: Production Expenses — Budget vs Actual, grouped by CBS
 // ---------------------------------------------------------------------------
 
-function ExpensesSection({
+const isHttp = (s?: string) =>
+  !!s && s.trim().toLowerCase().startsWith("http");
+
+function ProductionExpensesSection({
+  projectId,
   expenses,
   onChange,
+  onReload,
 }: {
-  expenses: ExpenseEntry[];
-  onChange: (next: ExpenseEntry[]) => void;
+  projectId: string;
+  expenses: ProductionExpense[];
+  onChange: (next: ProductionExpense[]) => void;
+  /** Re-fetch from the server (used to resync after a failed write). */
+  onReload: () => void;
 }) {
-  const update = (id: string, patch: Partial<ExpenseEntry>) =>
-    onChange(expenses.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  // Local edit — instant UI; persistence happens on blur / toggle.
+  const patchLocal = (id: string, partial: Partial<ProductionExpense>) =>
+    onChange(expenses.map((e) => (e.id === id ? { ...e, ...partial } : e)));
 
-  const total = expenses.reduce((acc, e) => acc + toNum(e.amount), 0);
-  const recoupable = expenses
-    .filter((e) => e.isRecoupable)
-    .reduce((acc, e) => acc + toNum(e.amount), 0);
+  const commit = (id: string, patch: UpdateExpenseInput) => {
+    updateProjectExpense(id, patch).catch((err) => {
+      console.error("[expenses] update failed:", err);
+      toast.error("บันทึกค่าใช้จ่ายไม่สำเร็จ");
+      onReload();
+    });
+  };
+
+  const addRow = async (group: string) => {
+    try {
+      const created = await createProjectExpense({
+        projectId,
+        expenseGroup: group,
+      });
+      onChange([...expenses, created]);
+    } catch (err) {
+      console.error("[expenses] add failed:", err);
+      toast.error("เพิ่มรายการไม่สำเร็จ");
+    }
+  };
+
+  const removeRow = async (id: string) => {
+    const prev = expenses;
+    onChange(expenses.filter((e) => e.id !== id)); // optimistic
+    try {
+      await deleteProjectExpense(id);
+    } catch (err) {
+      console.error("[expenses] delete failed:", err);
+      toast.error("ลบรายการไม่สำเร็จ");
+      onChange(prev);
+    }
+  };
+
+  // Always show the canonical CBS groups (so "+ Add Expense" is available even
+  // before rows exist), plus any extra groups present in the data.
+  const grouped = React.useMemo(() => {
+    const byGroup = new Map<string, ProductionExpense[]>();
+    for (const e of expenses) {
+      const g = e.expenseGroup || UNGROUPED_EXPENSE;
+      if (!byGroup.has(g)) byGroup.set(g, []);
+      byGroup.get(g)!.push(e);
+    }
+    const order = EXPENSE_GROUP_ORDER as readonly string[];
+    const names = [...new Set([...order, ...byGroup.keys()])];
+    const rank = (g: string) => {
+      const i = order.indexOf(g);
+      return i === -1 ? order.length : i;
+    };
+    return names
+      .toSorted((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      .map((group) => ({ group, rows: byGroup.get(group) ?? [] }));
+  }, [expenses]);
+
+  const totalBudget = expenses.reduce((a, e) => a + e.budgetedAmount, 0);
+  const totalActual = expenses.reduce((a, e) => a + e.actualAmount, 0);
+  const totalVerified = expenses.reduce((a, e) => a + e.verifiedAmount, 0);
+  // Variance against the final settled truth (Accounting-verified).
+  const variance = totalBudget - totalVerified;
 
   return (
     <section className="space-y-3">
       <div>
         <h3 className="text-sm font-semibold">
-          Production Expenses · Recoupable Ledger
+          Production Expenses · Budget vs Actual
         </h3>
         <p className="text-xs text-muted-foreground">
-          รายจ่ายที่ติ๊ก Recoup จะถูกหักคืนจากรายได้ก่อนแบ่งส่วนแบ่ง (Blueprint 4.2)
+          งบประมาณเทียบยอดจ่ายจริง จัดกลุ่มตามโครงสร้างต้นทุน (CBS) — แก้ไขแล้วบันทึกอัตโนมัติ
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Description</TableHead>
-              <TableHead className="w-48">Payee</TableHead>
-              <TableHead className="w-48">Type</TableHead>
-              <TableHead className="w-32 text-right">Amount (THB)</TableHead>
-              <TableHead className="w-20 text-center">Recoup?</TableHead>
+              <TableHead className="min-w-60">Description</TableHead>
+              <TableHead className="min-w-52">Payee</TableHead>
+              <TableHead className="w-28 text-right">Budget</TableHead>
+              <TableHead className="w-32 text-right">ใช้จริง (Producer)</TableHead>
+              <TableHead className="w-32 text-right">เกิดจริง (Account)</TableHead>
+              <TableHead className="w-48">Evidence Link</TableHead>
+              <TableHead className="w-16 text-center">Recoup?</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {expenses.map((e) => (
-              <TableRow key={e.id} className="hover:bg-transparent">
-                <TableCell className="p-2">
-                  <Input
-                    placeholder="เช่น ค่าห้องอัด, ค่า Arrange"
-                    value={e.description}
-                    onChange={(ev) =>
-                      update(e.id, { description: ev.target.value })
-                    }
-                  />
-                </TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    placeholder="ชื่อผู้รับเงิน"
-                    value={e.payeeName}
-                    onChange={(ev) =>
-                      update(e.id, { payeeName: ev.target.value })
-                    }
-                  />
-                </TableCell>
-                <TableCell className="p-2">
-                  <PayeeTypeSelect
-                    value={e.payeeType}
-                    onChange={(payeeType) => update(e.id, { payeeType })}
-                  />
-                </TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    className="text-right tabular-nums"
-                    value={e.amount}
-                    onChange={(ev) => update(e.id, { amount: ev.target.value })}
-                  />
-                </TableCell>
-                <TableCell className="p-2 text-center">
-                  <Checkbox
-                    checked={e.isRecoupable}
-                    onCheckedChange={(checked) =>
-                      update(e.id, { isRecoupable: checked === true })
-                    }
-                    aria-label="นำไปหักคืนทุน (Recoupable)"
-                  />
-                </TableCell>
-                <TableCell className="p-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label="ลบรายการ"
-                    disabled={expenses.length <= 1}
-                    onClick={() =>
-                      onChange(expenses.filter((x) => x.id !== e.id))
-                    }
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {grouped.map(({ group, rows }) => {
+              const gBudget = rows.reduce((a, e) => a + e.budgetedAmount, 0);
+              const gActual = rows.reduce((a, e) => a + e.actualAmount, 0);
+              const gVerified = rows.reduce((a, e) => a + e.verifiedAmount, 0);
+              return (
+                <React.Fragment key={group}>
+                  {/* Group header + subtotals + add-within-group */}
+                  <TableRow className="border-t-2 bg-muted/40 hover:bg-muted/40">
+                    <TableCell colSpan={2} className="py-2 font-semibold">
+                      {group}
+                    </TableCell>
+                    <TableCell className="py-2 text-right text-xs tabular-nums text-muted-foreground">
+                      {thb.format(gBudget)}
+                    </TableCell>
+                    <TableCell className="py-2 text-right text-xs tabular-nums text-muted-foreground">
+                      {thb.format(gActual)}
+                    </TableCell>
+                    <TableCell className="py-2 text-right text-xs tabular-nums text-muted-foreground">
+                      {thb.format(gVerified)}
+                    </TableCell>
+                    <TableCell colSpan={3} className="py-1.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground"
+                        onClick={() => addRow(group)}
+                      >
+                        <Plus className="size-3.5" />
+                        Add Expense
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {rows.map((e) => (
+                    <TableRow key={e.id} className="hover:bg-transparent">
+                      <TableCell className="p-2 align-top">
+                        <Input
+                          placeholder="รายละเอียด"
+                          value={e.description}
+                          onChange={(ev) =>
+                            patchLocal(e.id, { description: ev.target.value })
+                          }
+                          onBlur={(ev) =>
+                            commit(e.id, { description: ev.target.value })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
+                        {/* Payee + payment note stacked so they never overlap */}
+                        <div className="flex flex-col gap-1.5">
+                          <Input
+                            placeholder="ผู้รับเงิน"
+                            value={e.payeeName}
+                            onChange={(ev) =>
+                              patchLocal(e.id, { payeeName: ev.target.value })
+                            }
+                            onBlur={(ev) =>
+                              commit(e.id, { payeeName: ev.target.value })
+                            }
+                          />
+                          <Input
+                            placeholder="payment note (งวด/เงื่อนไข)"
+                            value={e.paymentNote ?? ""}
+                            onChange={(ev) =>
+                              patchLocal(e.id, { paymentNote: ev.target.value })
+                            }
+                            onBlur={(ev) =>
+                              commit(e.id, { paymentNote: ev.target.value })
+                            }
+                            className="h-7 text-xs text-muted-foreground"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="text-right tabular-nums"
+                          value={e.budgetedAmount}
+                          onFocus={(ev) => ev.target.select()}
+                          onChange={(ev) =>
+                            patchLocal(e.id, {
+                              budgetedAmount: toNum(ev.target.value),
+                            })
+                          }
+                          onBlur={(ev) =>
+                            commit(e.id, {
+                              budgetedAmount: toNum(ev.target.value),
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="text-right tabular-nums"
+                          value={e.actualAmount}
+                          onFocus={(ev) => ev.target.select()}
+                          onChange={(ev) =>
+                            patchLocal(e.id, {
+                              actualAmount: toNum(ev.target.value),
+                            })
+                          }
+                          onBlur={(ev) =>
+                            commit(e.id, { actualAmount: toNum(ev.target.value) })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="text-right tabular-nums"
+                          value={e.verifiedAmount}
+                          onFocus={(ev) => ev.target.select()}
+                          onChange={(ev) =>
+                            patchLocal(e.id, {
+                              verifiedAmount: toNum(ev.target.value),
+                            })
+                          }
+                          onBlur={(ev) =>
+                            commit(e.id, {
+                              verifiedAmount: toNum(ev.target.value),
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
+                        <div className="flex items-center gap-1">
+                          <Input
+                            placeholder="ลิงก์ใบเสร็จ/หลักฐาน"
+                            value={e.evidenceUrl ?? ""}
+                            onChange={(ev) =>
+                              patchLocal(e.id, { evidenceUrl: ev.target.value })
+                            }
+                            onBlur={(ev) =>
+                              commit(e.id, { evidenceUrl: ev.target.value })
+                            }
+                            className="min-w-0"
+                          />
+                          {isHttp(e.evidenceUrl) && (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 shrink-0 text-muted-foreground"
+                              aria-label="เปิดลิงก์หลักฐาน"
+                            >
+                              <a
+                                href={e.evidenceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="size-4" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-2 text-center align-top">
+                        <Checkbox
+                          checked={e.isRecoupable}
+                          onCheckedChange={(checked) => {
+                            const value = checked === true;
+                            patchLocal(e.id, { isRecoupable: value });
+                            commit(e.id, { isRecoupable: value });
+                          }}
+                          aria-label="Recoupable"
+                        />
+                      </TableCell>
+                      <TableCell className="p-2 align-top">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label="ลบรายการ"
+                          onClick={() => removeRow(e.id)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            onChange([
-              ...expenses,
-              {
-                id: crypto.randomUUID(),
-                description: "",
-                payeeName: "",
-                payeeType: "Individual",
-                amount: "",
-                isRecoupable: true,
-              },
-            ])
-          }
+      {/* Grand totals + variance (Maker vs Checker) */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="rounded-lg border px-3 py-2">
+          <div className="text-xs text-muted-foreground">Total Budget</div>
+          <div className="text-sm font-semibold tabular-nums">
+            {thb.format(totalBudget)}
+          </div>
+        </div>
+        <div className="rounded-lg border px-3 py-2">
+          <div className="text-xs text-muted-foreground">
+            รวมใช้จริง (Producer)
+          </div>
+          <div className="text-sm font-semibold tabular-nums">
+            {thb.format(totalActual)}
+          </div>
+        </div>
+        <div className="rounded-lg border px-3 py-2">
+          <div className="text-xs text-muted-foreground">
+            รวมเกิดจริง (Account)
+          </div>
+          <div className="text-sm font-semibold tabular-nums">
+            {thb.format(totalVerified)}
+          </div>
+        </div>
+        <div
+          className={cn(
+            "rounded-lg border px-3 py-2",
+            variance < 0
+              ? "border-red-500/40 bg-red-500/10"
+              : "border-emerald-500/40 bg-emerald-500/10"
+          )}
         >
-          <Plus data-icon="inline-start" />
-          Add Expense
-        </Button>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-muted-foreground">
-            รวมทั้งหมด{" "}
-            <span className="font-medium tabular-nums text-foreground">
-              {thb.format(total)}
-            </span>
-          </span>
-          <Badge variant="outline" className="tabular-nums">
-            Recoupable: {thb.format(recoupable)}
-          </Badge>
+          <div className="text-xs text-muted-foreground">
+            Variance (Budget − เกิดจริง)
+          </div>
+          <div
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              variance < 0
+                ? "text-red-700 dark:text-red-400"
+                : "text-emerald-700 dark:text-emerald-400"
+            )}
+          >
+            {thb.format(variance)}
+            {variance < 0 ? " · เกินงบ" : ""}
+          </div>
         </div>
       </div>
     </section>
@@ -432,18 +649,46 @@ function SplitsSection({
 // ---------------------------------------------------------------------------
 
 function FinanceTab({ project }: { project: Project }) {
-  const [finance, setFinance] = React.useState(() => financeOf(project.id));
+  // Production expenses are DB-backed; royalty splits stay local for now.
+  const [expenses, setExpenses] = React.useState<ProductionExpense[]>([]);
+  const [loadingExpenses, setLoadingExpenses] = React.useState(true);
+  const [splits, setSplits] = React.useState<SplitEntry[]>(
+    () => financeOf(project.id).splits
+  );
   const [saved, setSaved] = React.useState(false);
 
+  React.useEffect(() => {
+    let active = true;
+    listProjectExpenses(project.id)
+      .then((rows) => {
+        if (active) {
+          setExpenses(rows);
+          setLoadingExpenses(false);
+        }
+      })
+      .catch((err) => {
+        console.error("[FinanceTab] load expenses failed:", err);
+        if (active) setLoadingExpenses(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [project.id]);
+
+  const reloadExpenses = () => {
+    listProjectExpenses(project.id)
+      .then(setExpenses)
+      .catch((err) => console.error("[FinanceTab] reload failed:", err));
+  };
+
   const total =
-    Math.round(
-      finance.splits.reduce((acc, s) => acc + toNum(s.percentage), 0) * 100
-    ) / 100;
+    Math.round(splits.reduce((acc, s) => acc + toNum(s.percentage), 0) * 100) /
+    100;
   const isBalanced = total === 100;
 
   function handleSave() {
-    // TODO(Supabase phase): upsert PROJECT_EXPENSES + SONG_SPLITS
-    console.log("Save financial setup:", { projectId: project.id, ...finance });
+    // TODO(Supabase phase): persist SONG_SPLITS (expenses already autosave).
+    console.log("Save royalty splits:", { projectId: project.id, splits });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -454,15 +699,16 @@ function FinanceTab({ project }: { project: Project }) {
       `Project,${project.songName},${project.artistName},${project.label}`,
       "",
       "PRODUCTION EXPENSES",
-      "Description,Payee,Type,Amount (THB),Recoupable",
-      ...finance.expenses.map(
+      "Group,Description,Payee,Budget,Actual (Producer),Verified (Account),Recoupable,Evidence",
+      ...expenses.map(
         (e) =>
-          `"${e.description}","${e.payeeName}",${e.payeeType},${toNum(e.amount).toFixed(2)},${e.isRecoupable ? "Yes" : "No"}`
+          `"${e.expenseGroup}","${e.description}","${e.payeeName}",${e.budgetedAmount.toFixed(2)},${e.actualAmount.toFixed(2)},${e.verifiedAmount.toFixed(2)},${e.isRecoupable ? "Yes" : "No"},"${e.evidenceUrl ?? ""}"`
       ),
+      `,,Total,${expenses.reduce((a, e) => a + e.budgetedAmount, 0).toFixed(2)},${expenses.reduce((a, e) => a + e.actualAmount, 0).toFixed(2)},${expenses.reduce((a, e) => a + e.verifiedAmount, 0).toFixed(2)},,`,
       "",
       "ROYALTY SPLITS",
       "Role,Payee Type,Name,Percentage,Note",
-      ...finance.splits.map(
+      ...splits.map(
         (s) =>
           `${s.role},${s.payeeType},"${s.name}",${toNum(s.percentage).toFixed(2)},"${s.note}"`
       ),
@@ -480,16 +726,24 @@ function FinanceTab({ project }: { project: Project }) {
 
   return (
     <div className="space-y-6">
-      <ExpensesSection
-        expenses={finance.expenses}
-        onChange={(expenses) => setFinance((f) => ({ ...f, expenses }))}
-      />
+      {loadingExpenses ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          \u0E01\u0E33\u0E25\u0E31\u0E07\u0E42\u0E2B\u0E25\u0E14\u0E04\u0E48\u0E32\u0E43\u0E0A\u0E49\u0E08\u0E48\u0E32\u0E22\u2026
+        </p>
+      ) : (
+        <ProductionExpensesSection
+          projectId={project.id}
+          expenses={expenses}
+          onChange={setExpenses}
+          onReload={reloadExpenses}
+        />
+      )}
       <Separator />
       <SplitsSection
-        splits={finance.splits}
+        splits={splits}
         total={total}
         isBalanced={isBalanced}
-        onChange={(splits) => setFinance((f) => ({ ...f, splits }))}
+        onChange={setSplits}
       />
 
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -504,7 +758,7 @@ function FinanceTab({ project }: { project: Project }) {
               Saved!
             </>
           ) : (
-            "Save Financial Setup"
+            "Save Splits"
           )}
         </Button>
       </div>

@@ -5,14 +5,18 @@ import { revalidatePath } from "next/cache";
 import { addDays, diffDays, parseDate, toISODate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import {
+  mapProductionExpense,
   mapProject,
   mapProjectAsset,
   mapTask,
+  mapTaskComment,
   mapTaskDependency,
   mapTaskTemplate,
   mapTeamMember,
+  type ProductionExpenseRow,
   type ProjectAssetRow,
   type ProjectRow,
+  type TaskCommentRow,
   type TaskDependencyRow,
   type TaskRow,
   type TaskTemplateRow,
@@ -20,9 +24,11 @@ import {
 } from "@/lib/mappers";
 import type {
   CustomTaskInput,
+  ProductionExpense,
   Project,
   ProjectAsset,
   Task,
+  TaskComment,
   TaskDependency,
   TaskTemplate,
   TeamMember,
@@ -32,6 +38,8 @@ const ASSET_COLS =
   "id, project_id, category, note, source_link, official_drive_link, is_backed_up_local, created_at, updated_at";
 
 const PROJECT_COLS = "id, song_title, artist, label, project_type, release_date";
+const EXPENSE_COLS =
+  "id, project_id, expense_group, description, payee_name, payee_type, budgeted_amount, actual_amount, verified_amount, payment_note, evidence_url, is_recoupable, created_at";
 const TASK_COLS =
   "id, project_id, category, task_name, role, assigned_to, status, t_minus_days, duration_days, due_date, start_date, end_date, blocked_by";
 const TEMPLATE_COLS =
@@ -162,6 +170,35 @@ export async function createProject(
       throw new Error(tasksErr.message);
     }
     insertedTasks = data as TaskRow[];
+  }
+
+  // Seed the project's Production Expenses from the type's CBS template
+  // (e.g. 'Single'). Non-fatal: a missing template just means no seed rows.
+  const { data: exTemplates, error: exErr } = await supabase
+    .from("expense_templates")
+    .select("expense_group, description, is_recoupable")
+    .eq("project_type", input.projectType)
+    .order("sort_order");
+  if (exErr) {
+    console.error("[createProject] expense template lookup failed:", exErr);
+  } else if (exTemplates && exTemplates.length > 0) {
+    const expenseRows = exTemplates.map((t) => ({
+      id: crypto.randomUUID(),
+      project_id: projectRow.id,
+      expense_group: (t as { expense_group: string }).expense_group,
+      description: (t as { description: string }).description,
+      payee_type: "Individual",
+      payee_name: "",
+      budgeted_amount: 0,
+      actual_amount: 0,
+      is_recoupable: (t as { is_recoupable: boolean }).is_recoupable ?? true,
+    }));
+    const { error: seedErr } = await supabase
+      .from("production_expenses")
+      .insert(expenseRows);
+    if (seedErr) {
+      console.error("[createProject] expense seed insert failed:", seedErr);
+    }
   }
 
   revalidatePath("/");
@@ -915,4 +952,207 @@ export async function removeTaskDependency(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/internal");
+}
+
+// ---------------------------------------------------------------------------
+// Task comments (discussion thread in the Edit Task modal)
+// ---------------------------------------------------------------------------
+
+const TASK_COMMENT_COLS =
+  "id, task_id, author_id, author_name, content, created_at";
+
+/** A task's comment thread, oldest first. */
+export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("task_comments")
+    .select(TASK_COMMENT_COLS)
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as TaskCommentRow[]).map(mapTaskComment);
+}
+
+/** Result of a comment insert — returns the error as DATA so the real message
+ *  survives to the client (thrown Server Action errors are redacted in
+ *  deployed builds). */
+export type CreateTaskCommentResult =
+  | { ok: true; comment: TaskComment }
+  | { ok: false; error: string };
+
+/**
+ * Post a comment. The author is resolved from the signed-in user's email →
+ * team member (author_id); author_name is denormalized for display and falls
+ * back to the email's local part when the user isn't a linked member.
+ */
+export async function createTaskComment(
+  taskId: string,
+  content: string
+): Promise<CreateTaskCommentResult> {
+  const body = content.trim();
+  if (!body) return { ok: false, error: "ความคิดเห็นว่างเปล่า" };
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) {
+    console.error("[createTaskComment] no authenticated user:", authErr);
+    return { ok: false, error: "ไม่พบเซสชันผู้ใช้ (unauthenticated)" };
+  }
+  const email = user.email?.toLowerCase() ?? null;
+
+  let authorId: string | null = null;
+  let authorName = email ? email.split("@")[0] : "ไม่ทราบชื่อ";
+  if (email) {
+    const { data: member, error: memberErr } = await supabase
+      .from("team_members")
+      .select("id, name")
+      .eq("email", email)
+      .limit(1)
+      .maybeSingle();
+    if (memberErr) {
+      // Non-fatal — fall back to the email local part below.
+      console.error("[createTaskComment] member lookup failed:", memberErr);
+    }
+    if (member) {
+      authorId = (member as { id: string }).id;
+      authorName = (member as { name: string }).name;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("task_comments")
+    .insert({
+      task_id: taskId,
+      author_id: authorId,
+      author_name: authorName,
+      content: body,
+    })
+    .select(TASK_COMMENT_COLS)
+    .single();
+
+  if (error || !data) {
+    // Surfaces in the Vercel Function/Runtime logs for this deployment.
+    console.error("[createTaskComment] insert failed:", error);
+    return {
+      ok: false,
+      error: error?.message ?? "insert returned no row",
+    };
+  }
+  return { ok: true, comment: mapTaskComment(data as TaskCommentRow) };
+}
+
+// ---------------------------------------------------------------------------
+// Production expenses (Finance → Budget vs Actual, grouped by CBS)
+// ---------------------------------------------------------------------------
+
+/** Load a project's production expenses (Budget vs Actual), oldest first. */
+export async function listProjectExpenses(
+  projectId: string
+): Promise<ProductionExpense[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("production_expenses")
+    .select(EXPENSE_COLS)
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as ProductionExpenseRow[]).map(mapProductionExpense);
+}
+
+export interface CreateExpenseInput {
+  projectId: string;
+  expenseGroup: string;
+  description?: string;
+  payeeName?: string;
+  budgetedAmount?: number;
+  actualAmount?: number;
+  isRecoupable?: boolean;
+}
+
+/** Add one expense row under a group; returns the persisted row. */
+export async function createProjectExpense(
+  input: CreateExpenseInput
+): Promise<ProductionExpense> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("production_expenses")
+    .insert({
+      project_id: input.projectId,
+      expense_group: input.expenseGroup || null,
+      description: input.description ?? "",
+      payee_type: "Individual",
+      payee_name: input.payeeName ?? "",
+      budgeted_amount: input.budgetedAmount ?? 0,
+      actual_amount: input.actualAmount ?? 0,
+      is_recoupable: input.isRecoupable ?? true,
+    })
+    .select(EXPENSE_COLS)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to add expense");
+  }
+  revalidatePath("/");
+  return mapProductionExpense(data as ProductionExpenseRow);
+}
+
+export interface UpdateExpenseInput {
+  description?: string;
+  payeeName?: string;
+  budgetedAmount?: number;
+  actualAmount?: number;
+  verifiedAmount?: number;
+  paymentNote?: string | null;
+  evidenceUrl?: string | null;
+  isRecoupable?: boolean;
+  expenseGroup?: string;
+}
+
+/** Patch one expense row (only the provided fields). */
+export async function updateProjectExpense(
+  id: string,
+  patch: UpdateExpenseInput
+): Promise<void> {
+  const supabase = await createClient();
+
+  const payload: Record<string, string | number | boolean | null> = {};
+  if (patch.description !== undefined) payload.description = patch.description;
+  if (patch.payeeName !== undefined) payload.payee_name = patch.payeeName;
+  if (patch.budgetedAmount !== undefined)
+    payload.budgeted_amount = patch.budgetedAmount;
+  if (patch.actualAmount !== undefined)
+    payload.actual_amount = patch.actualAmount;
+  if (patch.verifiedAmount !== undefined)
+    payload.verified_amount = patch.verifiedAmount;
+  if (patch.paymentNote !== undefined)
+    payload.payment_note = patch.paymentNote || null;
+  if (patch.evidenceUrl !== undefined)
+    payload.evidence_url = patch.evidenceUrl || null;
+  if (patch.isRecoupable !== undefined)
+    payload.is_recoupable = patch.isRecoupable;
+  if (patch.expenseGroup !== undefined)
+    payload.expense_group = patch.expenseGroup || null;
+
+  if (Object.keys(payload).length === 0) return;
+
+  const { error } = await supabase
+    .from("production_expenses")
+    .update(payload)
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+}
+
+export async function deleteProjectExpense(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("production_expenses")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
 }

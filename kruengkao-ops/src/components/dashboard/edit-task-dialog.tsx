@@ -10,7 +10,6 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -25,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { formatFull, parseDate, toISODate } from "@/lib/dates";
 import { taskDeadline, taskStart } from "@/lib/mock-data";
 import type { Project, Task } from "@/lib/types";
+import { DiscussionThread } from "./discussion-thread";
 
 export interface EditTaskPatch {
   taskName: string;
@@ -72,19 +72,23 @@ export function DateField({
   );
 }
 
-/** Reusable modal to edit a task's name + start/end date range. */
+/** Reusable modal to edit a task's name + start/end date range, with a
+ *  side-by-side discussion thread. */
 export function EditTaskDialog({
   task,
   project,
   open,
   onOpenChange,
   onSave,
+  currentAuthor,
 }: {
   task: Task;
   project: Project | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (patch: EditTaskPatch) => Promise<void>;
+  /** Display name for the current user's optimistic comment bubbles. */
+  currentAuthor: string;
 }) {
   const initialEnd = project
     ? taskDeadline(task, project)
@@ -136,7 +140,7 @@ export function EditTaskDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md"
+        className="max-h-[90vh] overflow-y-auto sm:max-w-3xl lg:max-w-4xl"
         // Opened from a card/row/calendar block that may unmount — keep focus.
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -149,40 +153,49 @@ export function EditTaskDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-task-name">Task Name</Label>
-            <Input
-              id="edit-task-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="ชื่องาน"
-              autoFocus
-            />
-          </div>
+        {/* Stacked on mobile (form over thread); side-by-side on md+ */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* LEFT — task form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-task-name">Task Name</Label>
+              <Input
+                id="edit-task-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ชื่องาน"
+                autoFocus
+              />
+            </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <DateField label="Start Date" value={start} onChange={setStart} />
-            <DateField label="End Date" value={end} onChange={setEnd} />
-          </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DateField label="Start Date" value={start} onChange={setStart} />
+              <DateField label="End Date" value={end} onChange={setEnd} />
+            </div>
 
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
 
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" disabled={saving}>
-                Cancel
+            <div className="flex justify-end gap-2 pt-1">
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" disabled={saving}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
               </Button>
-            </DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </form>
+            </div>
+          </form>
+
+          {/* RIGHT — discussion thread */}
+          <div className="h-[340px] min-h-0 md:h-[440px]">
+            <DiscussionThread taskId={task.id} currentAuthor={currentAuthor} />
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
