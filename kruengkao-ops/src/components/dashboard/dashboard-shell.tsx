@@ -34,6 +34,7 @@ import {
 import { parseDate, toISODate } from "@/lib/dates";
 import { PROJECT_TYPES, projectTypeEmoji } from "@/lib/constants";
 import type {
+  LabelWithArtists,
   Project,
   ProjectType,
   Task,
@@ -72,6 +73,7 @@ export function DashboardShell({
   initialTasks,
   userEmail,
   taskTemplates = [],
+  labels = [],
   currentPerson = null,
   initialTab = "overview",
 }: {
@@ -79,6 +81,8 @@ export function DashboardShell({
   initialTasks: Task[];
   userEmail?: string | null;
   taskTemplates?: TaskTemplate[];
+  /** DB-backed Label → Artists pick-lists for the Create/Edit project form. */
+  labels?: LabelWithArtists[];
   /** Team-member name matched to the signed-in user (drives "My Tasks"). */
   currentPerson?: string | null;
   /** Which tab to open on mount (from the ?tab= query param). */
@@ -467,6 +471,7 @@ export function DashboardShell({
           onOpenChange={setCreateOpen}
           onSubmit={handleCreate}
           taskTemplates={taskTemplates}
+          labels={labels}
         />
 
         {/* Edit (pre-populated; keyed so the form re-inits per project) */}
@@ -479,6 +484,7 @@ export function DashboardShell({
           }}
           values={editValues}
           onSubmit={handleUpdateProject}
+          labels={labels}
         />
 
         {/* Create ad-hoc task — category locked to the button that opened it */}

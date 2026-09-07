@@ -4,6 +4,7 @@ import { toRoleGroups } from "@/lib/team";
 import {
   getCurrentUserEmail,
   getDashboardData,
+  getLabelsWithArtists,
   getTaskTemplates,
   getTeamMembers,
 } from "@/lib/queries";
@@ -15,12 +16,13 @@ export default async function Home({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const [{ projects, tasks }, userEmail, members, templates, { tab }] =
+  const [{ projects, tasks }, userEmail, members, templates, labels, { tab }] =
     await Promise.all([
       getDashboardData(),
       getCurrentUserEmail(),
       getTeamMembers(),
       getTaskTemplates(),
+      getLabelsWithArtists(),
       searchParams,
     ]);
 
@@ -43,6 +45,7 @@ export default async function Home({
         initialTasks={tasks}
         userEmail={userEmail}
         taskTemplates={templates}
+        labels={labels}
         currentPerson={currentPerson}
         initialTab={initialTab}
       />

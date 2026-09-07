@@ -18,6 +18,13 @@ export type ProjectType =
 
 export type WorkType = "Release" | "Internal";
 
+/** A record label and its roster of artists (DB-backed pick-lists). */
+export interface LabelWithArtists {
+  id: string;
+  name: string;
+  artists: string[];
+}
+
 /** A person on the team, assignable to tasks in their role (DB-backed roster). */
 export interface TeamMember {
   id: string;

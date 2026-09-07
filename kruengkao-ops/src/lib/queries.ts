@@ -16,6 +16,7 @@ import {
   type TeamMemberRow,
 } from "@/lib/mappers";
 import type {
+  LabelWithArtists,
   Project,
   ProjectAsset,
   Task,
@@ -164,6 +165,32 @@ export async function getProjectAssets(
 
   if (error) throw new Error(error.message);
   return (data as ProjectAssetRow[]).map(mapProjectAsset);
+}
+
+/** Labels + their artist rosters (DB pick-lists for the Create Release form). */
+export async function getLabelsWithArtists(): Promise<LabelWithArtists[]> {
+  const supabase = await createClient();
+  const [labelsRes, artistsRes] = await Promise.all([
+    supabase.from("labels").select("id, name, sort_order").order("sort_order").order("name"),
+    supabase
+      .from("artists")
+      .select("label_id, name, sort_order")
+      .order("sort_order")
+      .order("name"),
+  ]);
+  if (labelsRes.error) throw new Error(labelsRes.error.message);
+  if (artistsRes.error) throw new Error(artistsRes.error.message);
+
+  const byLabel = new Map<string, string[]>();
+  for (const a of artistsRes.data as { label_id: string; name: string }[]) {
+    if (!byLabel.has(a.label_id)) byLabel.set(a.label_id, []);
+    byLabel.get(a.label_id)!.push(a.name);
+  }
+  return (labelsRes.data as { id: string; name: string }[]).map((l) => ({
+    id: l.id,
+    name: l.name,
+    artists: byLabel.get(l.id) ?? [],
+  }));
 }
 
 /** The full team roster (DB source of truth), ordered by role then name. */

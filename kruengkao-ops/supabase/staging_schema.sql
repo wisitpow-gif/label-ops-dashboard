@@ -17,6 +17,8 @@ drop table if exists public.tasks;
 drop table if exists public.task_templates;
 drop table if exists public.expense_templates;
 drop table if exists public.team_members;
+drop table if exists public.artists;
+drop table if exists public.labels;
 drop table if exists public.projects;
 
 -- ── updated_at helper ───────────────────────────────────────────────────────
@@ -200,6 +202,63 @@ insert into public.team_members (name, role) values
   ('Bomb', 'Digital')
 on conflict (name, role) do nothing;
 
+-- ── labels + artists (0016) — pick-lists for the Create Release form ────────
+create table public.labels (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null unique,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table public.artists (
+  id         uuid primary key default gen_random_uuid(),
+  label_id   uuid not null references public.labels(id) on delete cascade,
+  name       text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (label_id, name)
+);
+
+create index idx_artists_label_id on public.artists(label_id);
+
+insert into public.labels (name, sort_order) values
+  ('BRIDGE', 0), ('MACHg', 1), ('9Arkkhan', 2)
+on conflict (name) do nothing;
+
+insert into public.artists (label_id, name, sort_order)
+select l.id, v.name, v.ord
+from (values
+  ('BRIDGE', 'ADORA', 0),
+  ('BRIDGE', 'ASIA7', 1),
+  ('BRIDGE', 'AYEJAY', 2),
+  ('BRIDGE', 'AYLA''s', 3),
+  ('BRIDGE', 'dena euprasert', 4),
+  ('BRIDGE', 'Famoso', 5),
+  ('BRIDGE', 'fit aroon', 6),
+  ('BRIDGE', 'FLURE', 7),
+  ('BRIDGE', 'Hard Boy', 8),
+  ('BRIDGE', 'INDIGO', 9),
+  ('BRIDGE', 'Jigsaw Story', 10),
+  ('BRIDGE', 'miller', 11),
+  ('BRIDGE', 'NINEOKMAI', 12),
+  ('BRIDGE', 'ossey', 13),
+  ('BRIDGE', 'Par-T', 14),
+  ('BRIDGE', 'QEETHA', 15),
+  ('BRIDGE', 'The Darkest Romance', 16),
+  ('BRIDGE', 'Three Man Down', 17),
+  ('BRIDGE', 'Tilly Birds', 18),
+  ('MACHg', 'ก้อง ห้วยไร่', 0),
+  ('MACHg', 'ใหม่ พัชรี', 1),
+  ('MACHg', 'กอกี้ กวิสรา', 2),
+  ('MACHg', 'ปราง ปรางทิพย์', 3),
+  ('MACHg', 'หนุ่ม ปริญวัฒน์', 4),
+  ('MACHg', 'วิว วัลนิกา', 5),
+  ('MACHg', 'ชาชม เสาวคนธ์', 6),
+  ('9Arkkhan', 'TaitosmitH', 0)
+) as v(label_name, name, ord)
+join public.labels l on l.name = v.label_name
+on conflict (label_id, name) do nothing;
+
 -- ── task_dependencies (0004) ────────────────────────────────────────────────
 create table public.task_dependencies (
   id                 uuid primary key default gen_random_uuid(),
@@ -356,6 +415,8 @@ alter table public.tasks               enable row level security;
 alter table public.task_templates      enable row level security;
 alter table public.project_assets      enable row level security;
 alter table public.team_members        enable row level security;
+alter table public.labels              enable row level security;
+alter table public.artists             enable row level security;
 alter table public.task_dependencies   enable row level security;
 alter table public.task_comments       enable row level security;
 alter table public.production_expenses enable row level security;
@@ -367,6 +428,8 @@ create policy authed_all_tasks             on public.tasks               for all
 create policy authed_all_task_templates    on public.task_templates      for all to authenticated using (true) with check (true);
 create policy authed_all_project_assets    on public.project_assets      for all to authenticated using (true) with check (true);
 create policy authed_all_team_members      on public.team_members        for all to authenticated using (true) with check (true);
+create policy authed_all_labels            on public.labels              for all to authenticated using (true) with check (true);
+create policy authed_all_artists           on public.artists             for all to authenticated using (true) with check (true);
 create policy authed_all_task_dependencies on public.task_dependencies   for all to authenticated using (true) with check (true);
 create policy authed_all_task_comments     on public.task_comments       for all to authenticated using (true) with check (true);
 create policy authed_all_expenses          on public.production_expenses for all to authenticated using (true) with check (true);

@@ -33,15 +33,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { addDays, diffDays, formatFull } from "@/lib/dates";
-import {
-  LABELS,
-  PROJECT_TYPES,
-  artistsForLabel,
-  projectTypeLabel,
-} from "@/lib/constants";
+import { PROJECT_TYPES, projectTypeLabel } from "@/lib/constants";
 import { TEAM_ROLES } from "@/lib/team";
 import { useTeam } from "@/components/team/team-provider";
-import type { CustomTaskInput, TaskTemplate } from "@/lib/types";
+import type {
+  CustomTaskInput,
+  LabelWithArtists,
+  TaskTemplate,
+} from "@/lib/types";
 
 const formSchema = z.object({
   songTitle: z.string().min(1, "กรอกชื่อเพลง"),
@@ -95,6 +94,7 @@ export function ProjectFormDialog({
   values,
   onSubmit,
   taskTemplates = [],
+  labels = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -103,6 +103,8 @@ export function ProjectFormDialog({
   onSubmit: (values: ProjectFormSubmit) => void | Promise<void>;
   /** Templates (all types) — used to know which roles a new project will need. */
   taskTemplates?: TaskTemplate[];
+  /** DB-backed Label → Artists pick-lists. */
+  labels?: LabelWithArtists[];
 }) {
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const { membersOfRole } = useTeam();
@@ -126,18 +128,26 @@ export function ProjectFormDialog({
   const isSaving = form.formState.isSubmitting;
   const isEdit = mode === "edit";
 
+  // DB-backed pick-lists (were the hardcoded LABEL_ARTISTS_DATA constant).
+  const labelNames = React.useMemo(() => labels.map((l) => l.name), [labels]);
+  const artistsByLabel = React.useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const l of labels) m.set(l.name, l.artists);
+    return m;
+  }, [labels]);
+
   // Dependent dropdown: artist options follow the selected label.
   const selectedLabel = useWatch({ control: form.control, name: "label" });
   const selectedArtist = useWatch({ control: form.control, name: "artist" });
   const artistOptions = React.useMemo(() => {
-    const list = artistsForLabel(selectedLabel ?? "");
+    const list = artistsByLabel.get(selectedLabel ?? "") ?? [];
     // Keep an already-saved artist visible even if it's not in the master
     // list (legacy data), so the Edit form shows the current value.
     if (selectedArtist && !list.includes(selectedArtist)) {
       return [selectedArtist, ...list];
     }
     return list;
-  }, [selectedLabel, selectedArtist]);
+  }, [artistsByLabel, selectedLabel, selectedArtist]);
 
   // Distinct roles the selected project type's tasks will use — one assignment
   // dropdown per role, ordered by the canonical department order.
@@ -339,7 +349,7 @@ export function ProjectFormDialog({
                       <SelectValue placeholder="เลือกสังกัด" />
                     </SelectTrigger>
                     <SelectContent>
-                      {LABELS.map((label) => (
+                      {labelNames.map((label) => (
                         <SelectItem key={label} value={label}>
                           {label}
                         </SelectItem>
