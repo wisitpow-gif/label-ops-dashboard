@@ -16,6 +16,7 @@ import {
   SquareKanban,
   Table2,
   UserCog,
+  Wallet,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ const MODULES: { href: string; label: string; icon: React.ElementType }[] = [
   { href: "/workload", label: "Team Workload", icon: SquareKanban },
   { href: "/gantt", label: "Gantt Chart", icon: ChartGantt },
   { href: "/calendar", label: "Calendar View", icon: CalendarRange },
+  { href: "/finance", label: "Finance", icon: Wallet },
 ];
 
 export function AppHeader({
