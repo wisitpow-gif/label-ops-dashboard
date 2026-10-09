@@ -1,0 +1,355 @@
+<title>Label ERP Data Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: single reading column; two hand-drawn SVG figures + example cards */
+  :root{
+    --bg:#f5f6f9; --surface:#ffffff; --surface-2:#f0f1f6; --fg:#1b1c24;
+    --muted:#5b5e6e; --border:#e3e4ec; --accent:#4b43c4;
+    --master:#0e7c86; --musical:#7c53e0; --money:#b8791b; --artist:#12855f;
+    --font: "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --bg:#14141a; --surface:#1d1e27; --surface-2:#242532; --fg:#e9e9f0;
+    --muted:#9a9db0; --border:#2e2f3b; --accent:#8e86ff;
+    --master:#3bc4cf; --musical:#a98cff; --money:#e0ad55; --artist:#3ac795;
+    color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#14141a; --surface:#1d1e27; --surface-2:#242532; --fg:#e9e9f0;
+    --muted:#9a9db0; --border:#2e2f3b; --accent:#8e86ff;
+    --master:#3bc4cf; --musical:#a98cff; --money:#e0ad55; --artist:#3ac795;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.55}
+  .wrap{max-width:980px;margin:0 auto;padding-inline:20px;padding-block:40px}
+  header.page{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:clamp(26px,4vw,38px);font-weight:700;margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .lede{color:var(--muted);max-width:62ch;margin:2px 0 0}
+  section{margin-top:44px}
+  h2{font-size:clamp(19px,2.4vw,23px);font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 18px;max-width:64ch}
+  figure{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .scroll{overflow-x:auto}
+  svg{max-width:100%;height:auto;color:var(--fg);display:block;margin:0 auto}
+  figcaption{color:var(--muted);font-size:13px;margin-top:12px;text-align:center}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:14px;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;background:currentColor}
+  /* worked example */
+  .pools{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  .pool{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
+  .pool h4{margin:0 0 2px;font-size:15px;font-weight:600}
+  .pool .wt{font-family:var(--mono);font-size:12px;color:var(--money);font-weight:500}
+  .pool ul{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+  .pool li{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}
+  .pool li b{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+  .pool .sum{border-top:1px dashed var(--border);margin-top:8px;padding-top:7px;color:var(--artist);font-weight:600}
+  .formula{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:14px;font-family:var(--mono);font-size:13px;overflow-x:auto}
+  .formula b{color:var(--accent)}
+  /* entity reference */
+  .ents{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .ent{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
+  .ent h4{margin:0;font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent)}
+  .ent p{margin:4px 0 8px;font-size:13px;color:var(--muted)}
+  .ent code{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;margin:0 3px 3px 0;display:inline-block}
+  /* callouts */
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+  .rule{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:13px 15px}
+  .rule.ok{border-left-color:var(--artist)} .rule.hold{border-left-color:var(--money)}
+  .rule b{display:block;font-size:14px;margin-bottom:2px}
+  .rule span{font-size:13px;color:var(--muted)}
+  .foot{margin-top:46px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px}
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow">บริษัท ครึ่งเก้า · ERP Spec</div>
+    <h1>โมเดลข้อมูล ERP — รายได้ เครดิต และส่วนแบ่ง</h1>
+    <p class="lede">แผนภาพสำหรับคุยกับทีม: รายได้ไหลเป็น 2 ชั้น (แบ่งค่าย↔ศิลปินตามสิทธิ์ แล้วฝั่งศิลปินลง pool ที่รวม 100%) พร้อมโครงตารางข้อมูลที่ dev จะเอาไปสร้างต่อ</p>
+  </header>
+
+  <!-- ===== FIG 1: Revenue flow ===== -->
+  <section>
+    <h2>1 · การไหลของรายได้ (2 ชั้น)</h2>
+    <p class="sub">รายได้แยกตามประเภทสิทธิ์ก่อน → แบ่งค่าย/ศิลปินตามดีล → “ฝั่งศิลปิน” กระจายลง royalty pool → ลงแต่ละคน</p>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 960 580" role="img" aria-label="รายได้แยกตาม Master Rights และ Musical Rights แบ่งค่ายกับศิลปินตามดีล แล้วฝั่งศิลปินลง royalty pool ที่รวม 100% แล้วลงแต่ละคน">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <style>
+          .bx{fill:var(--surface);stroke:currentColor;stroke-width:1.5;rx:10}
+          .t{fill:currentColor;font-family:var(--font);font-size:14px;font-weight:600;text-anchor:middle}
+          .ts{fill:var(--muted);font-family:var(--font);font-size:11.5px;text-anchor:middle}
+          .edge{stroke:var(--muted);stroke-width:1.5;fill:none}
+          .el{fill:var(--muted);font-family:var(--mono);font-size:11px;text-anchor:middle}
+        </style>
+
+        <!-- revenue -->
+        <g style="color:var(--money)">
+          <rect class="bx" x="360" y="20" width="240" height="56" rx="10"/>
+          <text class="t" x="480" y="44">รายได้จากเพลง</text>
+          <text class="ts" x="480" y="62">Revenue (net)</text>
+        </g>
+        <!-- split arrows -->
+        <path class="edge" d="M440 76 L270 116" marker-end="url(#ar)"/>
+        <path class="edge" d="M520 76 L690 116" marker-end="url(#ar)"/>
+        <text class="el" x="480" y="100">แยกตามสิทธิ์</text>
+
+        <!-- master / musical -->
+        <g style="color:var(--master)">
+          <rect class="bx" x="150" y="118" width="220" height="56" rx="10"/>
+          <text class="t" x="260" y="142">Master Rights</text>
+          <text class="ts" x="260" y="160">สิทธิ์ในมาสเตอร์ (สิ่งบันทึกเสียง)</text>
+        </g>
+        <g style="color:var(--musical)">
+          <rect class="bx" x="590" y="118" width="220" height="56" rx="10"/>
+          <text class="t" x="700" y="142">Musical Rights</text>
+          <text class="ts" x="700" y="160">ลิขสิทธิ์ดนตรี (คำร้อง/ทำนอง)</text>
+        </g>
+
+        <!-- master fork -->
+        <path class="edge" d="M210 174 L150 214" marker-end="url(#ar)"/>
+        <path class="edge" d="M310 174 L330 214" marker-end="url(#ar)"/>
+        <text class="el" x="188" y="200">70/30 · 80/20</text>
+        <g style="color:var(--muted)">
+          <rect x="70" y="216" width="130" height="50" rx="9" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"/>
+          <text class="t" x="135" y="238" style="font-size:13px">ค่าย</text>
+          <text class="ts" x="135" y="255">business model · TBD</text>
+        </g>
+        <g style="color:var(--artist)">
+          <rect class="bx" x="268" y="216" width="128" height="50" rx="9"/>
+          <text class="t" x="332" y="238" style="font-size:13px">ศิลปิน</text>
+          <text class="ts" x="332" y="255">20–30%</text>
+        </g>
+
+        <!-- musical fork -->
+        <path class="edge" d="M750 174 L690 214" marker-end="url(#ar)"/>
+        <path class="edge" d="M650 174 L630 214" marker-end="url(#ar)"/>
+        <text class="el" x="772" y="200">50 / 50</text>
+        <g style="color:var(--muted)">
+          <rect x="760" y="216" width="130" height="50" rx="9" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"/>
+          <text class="t" x="825" y="238" style="font-size:13px">ค่าย</text>
+          <text class="ts" x="825" y="255">business model · TBD</text>
+        </g>
+        <g style="color:var(--artist)">
+          <rect class="bx" x="564" y="216" width="128" height="50" rx="9"/>
+          <text class="t" x="628" y="238" style="font-size:13px">ศิลปิน</text>
+          <text class="ts" x="628" y="255">50%</text>
+        </g>
+
+        <!-- converge to pools -->
+        <path class="edge" d="M332 266 L452 352" marker-end="url(#ar)"/>
+        <path class="edge" d="M628 266 L508 352" marker-end="url(#ar)"/>
+        <text class="el" x="480" y="318">ฝั่งศิลปิน → pool</text>
+        <g style="color:var(--accent)">
+          <rect class="bx" x="320" y="354" width="320" height="58" rx="11"/>
+          <text class="t" x="480" y="379">Royalty Pools</text>
+          <text class="ts" x="480" y="397">หลายหัวข้อ · แต่ละ pool รวม = 100%</text>
+        </g>
+
+        <!-- recoup side note -->
+        <g style="color:var(--muted)">
+          <rect x="690" y="356" width="214" height="54" rx="9" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"/>
+          <text class="t" x="797" y="378" style="font-size:12.5px">recoup</text>
+          <text class="ts" x="797" y="395">หักต้นทุนก่อนแบ่ง · กำหนดภายหลัง</text>
+          <path class="edge" d="M690 383 L644 383" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+        </g>
+
+        <!-- pools to shares -->
+        <path class="edge" d="M480 412 L480 452" marker-end="url(#ar)"/>
+        <text class="el" x="480" y="438">แบ่ง 100% ตามสัดส่วน</text>
+        <g>
+          <rect class="bx" x="330" y="454" width="300" height="54" rx="11" style="stroke:var(--fg)"/>
+          <text class="t" x="480" y="476">ส่วนแบ่งต่อคน</text>
+          <text class="ts" x="480" y="494">royalty_share · ต่อ person</text>
+        </g>
+      </svg>
+      </div>
+      <div class="legend">
+        <span style="color:var(--money)"><i class="dot"></i>รายได้</span>
+        <span style="color:var(--master)"><i class="dot"></i>Master Rights</span>
+        <span style="color:var(--musical)"><i class="dot"></i>Musical Rights</span>
+        <span style="color:var(--artist)"><i class="dot"></i>ฝั่งศิลปิน</span>
+        <span style="color:var(--accent)"><i class="dot"></i>Royalty pool</span>
+        <span style="color:var(--muted)"><i class="dot" style="background:transparent;border:1.3px dashed currentColor"></i>ยังไม่ลงรายละเอียด</span>
+      </div>
+      <figcaption>ชั้นบน (ค่าย↔ศิลปิน) เก็บแค่โครงสร้าง+ค่า default · ชั้นล่าง (pool → คน) ละเอียดครบแล้ว</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== FIG 2: Pool concept ===== -->
+  <section>
+    <h2>2 · แนวคิด Royalty Pool (แต่ละหัวข้อ = 100%)</h2>
+    <p class="sub">ตัวอย่างจากเพลง “จักรวาลไหน” — แตกตัวเลขเก่าเป็น (น้ำหนัก pool) × (ส่วนแบ่งในกลุ่มที่รวม 100%)</p>
+    <div class="pools">
+      <div class="pool">
+        <h4>คำร้อง (Lyrics)</h4><span class="wt">น้ำหนัก 2.0%</span>
+        <ul>
+          <li><span>ชัยกำพล</span><b>50%</b></li>
+          <li><span>ธนศักดิ์</span><b>25%</b></li>
+          <li><span>MONICA</span><b>25%</b></li>
+          <li class="sum"><span>รวม</span><b>100%</b></li>
+        </ul>
+      </div>
+      <div class="pool">
+        <h4>ทำนอง (Melody)</h4><span class="wt">น้ำหนัก 2.0%</span>
+        <ul>
+          <li><span>ชัยกำพล</span><b>100%</b></li>
+          <li class="sum"><span>รวม</span><b>100%</b></li>
+        </ul>
+      </div>
+      <div class="pool">
+        <h4>Producer</h4><span class="wt">น้ำหนัก 1.5%</span>
+        <ul>
+          <li><span>BOSSA</span><b>100%</b></li>
+          <li class="sum"><span>รวม</span><b>100%</b></li>
+        </ul>
+      </div>
+      <div class="pool">
+        <h4>Artist</h4><span class="wt">น้ำหนัก 6.0%</span>
+        <ul>
+          <li><span>ชัยกำพล</span><b>50%</b></li>
+          <li><span>MONICA</span><b>50%</b></li>
+          <li class="sum"><span>รวม</span><b>100%</b></li>
+        </ul>
+      </div>
+    </div>
+    <div class="formula">
+      แบบรวมต่อคน = <b>Σ</b> ( น้ำหนัก_pool × ส่วนแบ่งในกลุ่ม )<br>
+      เช่น ชัยกำพล · คำร้อง = 2.0% × 50% = <b>1.0%</b>  (ตรงกับตัวเลขเก่า)
+    </div>
+  </section>
+
+  <!-- ===== FIG 3: Data model ===== -->
+  <section>
+    <h2>3 · โครงตารางข้อมูล (Data model)</h2>
+    <p class="sub">แกนคือ release · ต้นทุนแยกเป็น song_credit · ส่วนแบ่งเป็น royalty_pool → royalty_share · คนเป็น person (master)</p>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 960 520" role="img" aria-label="ความสัมพันธ์ตาราง: release มี deliverable, มี song_credit (ต้นทุน), มี royalty_pool ที่ splits 100% เป็น royalty_share; person ถูกจ่ายใน song_credit และได้ส่วนแบ่งใน royalty_share">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <style>
+          .e{fill:var(--surface);stroke:currentColor;stroke-width:1.5}
+          .en{fill:currentColor;font-family:var(--mono);font-size:13px;font-weight:600;text-anchor:middle}
+          .fl{fill:var(--muted);font-family:var(--mono);font-size:11px;text-anchor:middle}
+          .ln{stroke:var(--muted);stroke-width:1.5;fill:none}
+          .lb{fill:var(--muted);font-family:var(--mono);font-size:10.5px;text-anchor:middle}
+        </style>
+
+        <!-- relations (draw first, behind boxes) -->
+        <path class="ln" d="M490 64 L700 64" marker-end="url(#ar2)"/>
+        <text class="lb" x="595" y="54">has</text>
+        <path class="ln" d="M400 116 L400 196" marker-end="url(#ar2)"/>
+        <text class="lb" x="400" y="160">costs (work_fee)</text>
+        <path class="ln" d="M490 88 L560 210" marker-end="url(#ar2)"/>
+        <text class="lb" x="548" y="150">royalty pools</text>
+        <path class="ln" d="M650 300 L650 366" marker-end="url(#ar2)"/>
+        <text class="lb" x="650" y="337">splits 100%</text>
+        <path class="ln" d="M220 250 L298 250" marker-end="url(#ar2)"/>
+        <text class="lb" x="259" y="240">paid</text>
+        <path class="ln" d="M130 306 L130 414 L556 414" marker-end="url(#ar2)"/>
+        <text class="lb" x="330" y="428">earns share</text>
+
+        <!-- RELEASE -->
+        <g style="color:var(--accent)">
+          <rect class="e" x="310" y="24" width="180" height="92" rx="9"/>
+          <text class="en" x="400" y="46">release</text>
+          <text class="fl" x="400" y="66">song, artist, label</text>
+          <text class="fl" x="400" y="82">release_at, genre</text>
+          <text class="fl" x="400" y="98">isrc, urls, tiktok</text>
+        </g>
+        <!-- DELIVERABLE -->
+        <g style="color:var(--master)">
+          <rect class="e" x="700" y="24" width="190" height="92" rx="9"/>
+          <text class="en" x="795" y="46">deliverable</text>
+          <text class="fl" x="795" y="66">type, variant</text>
+          <text class="fl" x="795" y="82">file_url</text>
+          <text class="fl" x="795" y="98">status</text>
+        </g>
+        <!-- PERSON -->
+        <g style="color:var(--money)">
+          <rect class="e" x="40" y="198" width="180" height="108" rx="9"/>
+          <text class="en" x="130" y="220">person</text>
+          <text class="fl" x="130" y="240">name_th / _en</text>
+          <text class="fl" x="130" y="256">payee_type</text>
+          <text class="fl" x="130" y="272">bank, tax_id</text>
+          <text class="fl" x="130" y="294">(master, reuse)</text>
+        </g>
+        <!-- SONG_CREDIT -->
+        <g>
+          <rect class="e" x="300" y="198" width="200" height="104" rx="9" style="stroke:var(--fg)"/>
+          <text class="en" x="400" y="220" style="fill:var(--fg)">song_credit</text>
+          <text class="fl" x="400" y="242">role</text>
+          <text class="fl" x="400" y="258">work_fee</text>
+          <text class="fl" x="400" y="274">is_recoupable</text>
+          <text class="fl" x="400" y="292">(ต้นทุนค่าทำงาน)</text>
+        </g>
+        <!-- ROYALTY_POOL -->
+        <g style="color:var(--musical)">
+          <rect class="e" x="560" y="198" width="180" height="104" rx="9"/>
+          <text class="en" x="650" y="220">royalty_pool</text>
+          <text class="fl" x="650" y="242">category</text>
+          <text class="fl" x="650" y="258">rights_type</text>
+          <text class="fl" x="650" y="274">weight_pct</text>
+          <text class="fl" x="650" y="292">calc_method</text>
+        </g>
+        <!-- ROYALTY_SHARE -->
+        <g style="color:var(--artist)">
+          <rect class="e" x="560" y="368" width="180" height="92" rx="9"/>
+          <text class="en" x="650" y="390">royalty_share</text>
+          <text class="fl" x="650" y="410">person · share_pct</text>
+          <text class="fl" x="650" y="428">Σ ต่อ pool = 100%</text>
+          <text class="fl" x="650" y="446">(ส่วนแบ่งฝั่งศิลปิน)</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption>production_expense (CBS งบ/ใช้จริง/เกิดจริง ของทั้งโปรเจกต์) อยู่คู่ขนาน — ไม่วาดในแผนนี้เพื่อให้เห็นเส้นทางเครดิต/ส่วนแบ่งชัด</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== Entity reference ===== -->
+  <section>
+    <h2>4 · ตารางโดยย่อ</h2>
+    <p class="sub">ฟิลด์หลักต่อ entity (รายละเอียดเต็ม + ร่าง SQL อยู่ในเอกสารสเปค)</p>
+    <div class="ents">
+      <div class="ent"><h4>release</h4><p>เพลง + metadata จัดจำหน่าย</p>
+        <code>song_title_th/en</code><code>release_at</code><code>platforms</code><code>genre</code><code>duration_sec</code><code>isrc</code><code>spotify/apple/youtube_url</code><code>tiktok_start_*</code><code>status</code></div>
+      <div class="ent"><h4>deliverable</h4><p>ไฟล์ส่งมอบ (checklist)</p>
+        <code>type</code><code>variant</code><code>file_url</code><code>local_backup</code><code>status</code></div>
+      <div class="ent"><h4>song_credit</h4><p>ค่าทำงานต่อคนต่อบทบาท</p>
+        <code>person_id</code><code>role</code><code>work_fee</code><code>is_recoupable</code><code>payment_detail</code></div>
+      <div class="ent"><h4>royalty_pool</h4><p>หัวข้อส่วนแบ่ง (ไม่จำกัดจำนวน)</p>
+        <code>category</code><code>rights_type</code><code>weight_pct</code><code>calc_method</code></div>
+      <div class="ent"><h4>royalty_share</h4><p>ส่วนแบ่งต่อคนใน pool</p>
+        <code>pool_id</code><code>person_id</code><code>share_pct</code> · Σ/pool = 100%</div>
+      <div class="ent"><h4>person</h4><p>master ผู้ร่วมงาน/ผู้รับเงิน</p>
+        <code>name_th/en</code><code>payee_type</code><code>bank_account</code><code>tax_id</code></div>
+    </div>
+  </section>
+
+  <!-- ===== Rules / decisions ===== -->
+  <section>
+    <h2>5 · กฎ & สิ่งที่ยังไม่เคาะ</h2>
+    <div class="rules">
+      <div class="rule ok"><b>แต่ละ pool = 100%</b><span>Σ share_pct ต่อ 1 pool ต้องเท่ากับ 100% เสมอ</span></div>
+      <div class="rule"><b>แบบรวม = Σ(น้ำหนัก × ส่วนแบ่ง)</b><span>ใช้สูตรนี้ไปก่อน</span></div>
+      <div class="rule hold"><b>ส่วนของค่าย → business model</b><span>Mastered Rights 70/30·80/20 · Musical Rights 50/50 — ยังไม่ลงรายละเอียด</span></div>
+      <div class="rule hold"><b>recoup — กำหนดภายหลัง</b><span>เก็บ is_recoupable ไว้รองรับการหักทุนก่อนแบ่ง</span></div>
+    </div>
+  </section>
+
+  <div class="foot">บริษัท ครึ่งเก้า · ร่างสำหรับส่งมอบทีมพัฒนา ERP — โครงสร้างและกฎ ไม่ผูกกับภาษา/เฟรมเวิร์ก</div>
+</div>
