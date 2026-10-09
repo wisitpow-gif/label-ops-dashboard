@@ -648,7 +648,7 @@ function SplitsSection({
 // Finance & Splits tab (Phase 2)
 // ---------------------------------------------------------------------------
 
-function FinanceTab({ project }: { project: Project }) {
+export function FinanceTab({ project }: { project: Project }) {
   // Production expenses are DB-backed; royalty splits stay local for now.
   const [expenses, setExpenses] = React.useState<ProductionExpense[]>([]);
   const [loadingExpenses, setLoadingExpenses] = React.useState(true);

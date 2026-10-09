@@ -138,6 +138,72 @@ export async function getOfficialAssets(): Promise<ProjectAsset[]> {
   return (data as ProjectAssetRow[]).map(mapProjectAsset);
 }
 
+/** Per-project finance rollup (Budget vs Actual vs Verified) for the Finance
+ *  dashboard. Data stays project-scoped — this just aggregates each project's
+ *  production_expenses rows. */
+export interface FinanceSummaryRow {
+  project: Project;
+  budgeted: number;
+  actual: number;
+  verified: number;
+  /** Final recoupable cost = Σ verified_amount where is_recoupable. */
+  recoupable: number;
+}
+
+export async function getFinanceSummary(): Promise<FinanceSummaryRow[]> {
+  const supabase = await createClient();
+  const [projRes, expRes] = await Promise.all([
+    supabase
+      .from("projects")
+      .select(PROJECT_COLS)
+      .eq("work_type", "Release")
+      .order("release_date"),
+    supabase
+      .from("production_expenses")
+      .select(
+        "project_id, budgeted_amount, actual_amount, verified_amount, is_recoupable"
+      ),
+  ]);
+  if (projRes.error) throw new Error(projRes.error.message);
+  if (expRes.error) throw new Error(expRes.error.message);
+
+  interface Agg {
+    budgeted: number;
+    actual: number;
+    verified: number;
+    recoupable: number;
+  }
+  const byProject = new Map<string, Agg>();
+  const rows = expRes.data as {
+    project_id: string;
+    budgeted_amount: number | string;
+    actual_amount: number | string;
+    verified_amount: number | string;
+    is_recoupable: boolean;
+  }[];
+  for (const e of rows) {
+    const cur =
+      byProject.get(e.project_id) ??
+      { budgeted: 0, actual: 0, verified: 0, recoupable: 0 };
+    const v = Number(e.verified_amount) || 0;
+    cur.budgeted += Number(e.budgeted_amount) || 0;
+    cur.actual += Number(e.actual_amount) || 0;
+    cur.verified += v;
+    if (e.is_recoupable) cur.recoupable += v;
+    byProject.set(e.project_id, cur);
+  }
+
+  return (projRes.data as ProjectRow[]).map(mapProject).map((project) => {
+    const a = byProject.get(project.id) ?? {
+      budgeted: 0,
+      actual: 0,
+      verified: 0,
+      recoupable: 0,
+    };
+    return { project, ...a };
+  });
+}
+
 /** A single project by id (null if not found). */
 export async function getProjectById(id: string): Promise<Project | null> {
   const supabase = await createClient();
