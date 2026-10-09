@@ -4,6 +4,7 @@ import { toRoleGroups } from "@/lib/team";
 import {
   getCurrentUserEmail,
   getDashboardData,
+  getLabelsWithArtists,
   getTaskTemplates,
   getTeamMembers,
 } from "@/lib/queries";
@@ -19,12 +20,13 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [{ projects, tasks }, userEmail, members, templates] =
+  const [{ projects, tasks }, userEmail, members, templates, labels] =
     await Promise.all([
       getDashboardData(),
       getCurrentUserEmail(),
       getTeamMembers(),
       getTaskTemplates(),
+      getLabelsWithArtists(),
     ]);
 
   const normalizedEmail = userEmail?.toLowerCase() ?? null;
@@ -41,6 +43,7 @@ export default async function AppLayout({
         userEmail={userEmail}
         taskTemplates={templates}
         currentPerson={currentPerson}
+        labels={labels}
       >
         {children}
       </AppProvider>

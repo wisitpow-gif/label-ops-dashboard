@@ -18,6 +18,15 @@ export type ProjectType =
 
 export type WorkType = "Release" | "Internal";
 
+/** A Label and the Artists signed to it (DB-backed, migration 0016). The
+ *  project form uses this to drive the Label → Artist dependent dropdown;
+ *  falls back to hardcoded constants when the tables aren't seeded yet. */
+export interface LabelWithArtists {
+  id: string;
+  name: string;
+  artists: string[];
+}
+
 /** A person on the team, assignable to tasks in their role (DB-backed roster). */
 export interface TeamMember {
   id: string;

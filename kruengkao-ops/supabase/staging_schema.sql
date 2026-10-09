@@ -372,3 +372,49 @@ create policy authed_all_task_comments     on public.task_comments       for all
 create policy authed_all_expenses          on public.production_expenses for all to authenticated using (true) with check (true);
 create policy authed_all_expense_templates on public.expense_templates   for all to authenticated using (true) with check (true);
 create policy authed_all_splits            on public.royalty_splits      for all to authenticated using (true) with check (true);
+
+-- ============================================================================
+-- labels + artists (0016): DB source of truth for the Label → Artist roster
+-- that drives the dependent dropdowns in the project form.
+-- ============================================================================
+create table public.labels (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null unique,
+  created_at timestamptz not null default now()
+);
+
+create table public.artists (
+  id         uuid primary key default gen_random_uuid(),
+  label_id   uuid not null references public.labels(id) on delete cascade,
+  name       text not null,
+  created_at timestamptz not null default now(),
+  unique (label_id, name)
+);
+
+create index idx_artists_label on public.artists(label_id);
+
+alter table public.labels  enable row level security;
+alter table public.artists enable row level security;
+
+create policy authed_all_labels  on public.labels  for all to authenticated using (true) with check (true);
+create policy authed_all_artists on public.artists for all to authenticated using (true) with check (true);
+
+insert into public.labels (name) values
+  ('BRIDGE'), ('MACHg'), ('9Arkkhan')
+on conflict (name) do nothing;
+
+insert into public.artists (label_id, name)
+select l.id, a.name
+from public.labels l
+join (values
+  ('BRIDGE', 'ADORA'), ('BRIDGE', 'ASIA7'), ('BRIDGE', 'AYEJAY'), ('BRIDGE', 'AYLA''s'),
+  ('BRIDGE', 'dena euprasert'), ('BRIDGE', 'Famoso'), ('BRIDGE', 'fit aroon'), ('BRIDGE', 'FLURE'),
+  ('BRIDGE', 'Hard Boy'), ('BRIDGE', 'INDIGO'), ('BRIDGE', 'Jigsaw Story'), ('BRIDGE', 'miller'),
+  ('BRIDGE', 'NINEOKMAI'), ('BRIDGE', 'ossey'), ('BRIDGE', 'Par-T'), ('BRIDGE', 'QEETHA'),
+  ('BRIDGE', 'The Darkest Romance'), ('BRIDGE', 'Three Man Down'), ('BRIDGE', 'Tilly Birds'),
+  ('MACHg', 'ก้อง ห้วยไร่'), ('MACHg', 'ใหม่ พัชรี'), ('MACHg', 'กอกี้ กวิสรา'),
+  ('MACHg', 'ปราง ปรางทิพย์'), ('MACHg', 'หนุ่ม ปริญวัฒน์'), ('MACHg', 'วิว วัลนิกา'),
+  ('MACHg', 'ชาชม เสาวคนธ์'),
+  ('9Arkkhan', 'TaitosmitH')
+) as a(label, name) on a.label = l.name
+on conflict (label_id, name) do nothing;

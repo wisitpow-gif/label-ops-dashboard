@@ -16,6 +16,7 @@ import {
   type TeamMemberRow,
 } from "@/lib/mappers";
 import type {
+  LabelWithArtists,
   Project,
   ProjectAsset,
   Task,
@@ -242,6 +243,31 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
     .order("name");
   if (error) throw new Error(error.message);
   return (data as TeamMemberRow[]).map(mapTeamMember);
+}
+
+/** Labels with their signed Artists (migration 0016). Returns [] if the tables
+ *  don't exist yet or are empty — callers fall back to hardcoded constants so
+ *  the project form keeps working before the migration/seed is applied. */
+export async function getLabelsWithArtists(): Promise<LabelWithArtists[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("labels")
+      .select("id, name, artists:artists(name)")
+      .order("name");
+    if (error || !data) return [];
+    return (
+      data as { id: string; name: string; artists: { name: string }[] }[]
+    ).map((l) => ({
+      id: l.id,
+      name: l.name,
+      artists: (l.artists ?? []).map((a) => a.name).toSorted((x, y) =>
+        x.localeCompare(y, "th")
+      ),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /** All configurable task templates, ordered by type then chronological

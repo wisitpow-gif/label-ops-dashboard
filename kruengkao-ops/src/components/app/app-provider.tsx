@@ -4,7 +4,14 @@ import * as React from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { parseDate, toISODate } from "@/lib/dates";
 import { PROJECT_TYPES } from "@/lib/constants";
-import type { Project, ProjectType, Task, TaskGroup, TaskTemplate } from "@/lib/types";
+import type {
+  LabelWithArtists,
+  Project,
+  ProjectType,
+  Task,
+  TaskGroup,
+  TaskTemplate,
+} from "@/lib/types";
 import { toast } from "sonner";
 
 import {
@@ -65,6 +72,7 @@ export function AppProvider({
   userEmail,
   taskTemplates = [],
   currentPerson = null,
+  labels = [],
   children,
 }: {
   initialProjects: Project[];
@@ -72,6 +80,7 @@ export function AppProvider({
   userEmail?: string | null;
   taskTemplates?: TaskTemplate[];
   currentPerson?: string | null;
+  labels?: LabelWithArtists[];
   children: React.ReactNode;
 }) {
   const [projects, setProjects] = React.useState<Project[]>(initialProjects);
@@ -295,6 +304,7 @@ export function AppProvider({
           onOpenChange={setCreateOpen}
           onSubmit={handleCreate}
           taskTemplates={taskTemplates}
+          labels={labels}
         />
 
         <ProjectFormDialog
@@ -306,6 +316,7 @@ export function AppProvider({
           }}
           values={editValues}
           onSubmit={handleUpdateProject}
+          labels={labels}
         />
 
         {addTaskCtx && (
